@@ -113,6 +113,14 @@ runs:
         echo "actions-converted=$actions_converted" >> $GITHUB_OUTPUT
         echo "files-modified=$files_modified" >> $GITHUB_OUTPUT
 
+        # Show git diff if not in dry-run mode and changes were made
+        if [[ "${{ inputs.dry-run }}" != "true" ]] && [[ "$files_modified" -gt 0 ]]; then
+          echo ""
+          echo "=== Git diff of changes made ==="
+          git diff --color=always || echo "No changes to display (files may have been added/removed)"
+          echo "================================"
+        fi
+
         # Clean up temp file if created
         if [[ -n "${{ inputs.allowlist }}" ]]; then
           rm -f "$allowlist_file"
