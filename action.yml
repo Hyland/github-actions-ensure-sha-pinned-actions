@@ -113,6 +113,7 @@ runs:
         echo "actions-converted=$actions_converted" >> $GITHUB_OUTPUT
         echo "files-modified=$files_modified" >> $GITHUB_OUTPUT
 
+        echo "=== Git diff of changes made ==="
         # Show git diff if not in dry-run mode and changes were made
         if [[ "${{ inputs.dry-run }}" != "true" ]] && [[ "$files_modified" -gt 0 ]]; then
           echo ""
