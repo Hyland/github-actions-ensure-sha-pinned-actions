@@ -98,4 +98,4 @@ jobs:
         if: ${{ steps.set-release-level.outputs.release-level != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create ${{ steps.bump-semver.outputs.new-version }} --generate-notes -t ${{ steps.bump-semver.outputs.new-version }}
+        run: gh release create "${{ steps.bump-semver.outputs.new-version }}" --generate-notes -t "${{ steps.bump-semver.outputs.new-version }}"
