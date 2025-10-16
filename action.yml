@@ -97,10 +97,10 @@ runs:
           args+=("--allowlist" "$allowlist_file")
         fi
 
-        echo "Running: python gha_sha_convert.py ${args[*]}"
+        echo "Running: python ${{ github.action_path }}/gha_sha_convert.py ${args[*]}"
 
         # Capture output and statistics
-        output=$(python gha_sha_convert.py "${args[@]}" 2>&1) || exit_code=$?
+        output=$(python ${{ github.action_path }}/gha_sha_convert.py "${args[@]}" 2>&1) || exit_code=$?
 
         echo "$output"
 
