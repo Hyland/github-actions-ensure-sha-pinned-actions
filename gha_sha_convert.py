@@ -1,20 +1,26 @@
 #!/usr/bin/env python
-"""GitHub Actions SHA Converter
+"""GitHub Actions SHA Converter.
 
-A pre-commit hook to convert GitHub Actions references to use SHA hashes
-for supply chain security while preserving semantic version comments.
+Converts GitHub Actions to use SHA-pinned versions for security.
 """
 from __future__ import annotations
 
 import argparse
+import json
+import logging
 import os
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import yaml
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class GitHubActionsConverter:
@@ -41,6 +47,11 @@ class GitHubActionsConverter:
         self.allowlist = allowlist or []
         self.session = self._create_session()
         self.cache: dict[str, str] = {}
+
+        # Pre-compile regex patterns for better performance
+        self.action_pattern = re.compile(r'uses:\s*([^@\s]+)@([^\s#]+)(?:\s*#\s*([^\s]+))?')
+        self.sha_pattern = re.compile(r'^[a-f0-9]{40}$')
+        self.semver_pattern = re.compile(r'^v?\d+\.\d+\.\d+')
 
     def _create_session(self) -> requests.Session:
         """Create a requests session with retry strategy."""
@@ -87,13 +98,11 @@ class GitHubActionsConverter:
 
     def is_semver(self, version: str) -> bool:
         """Check if version string is semantic version."""
-        return len(version.split('.')) >= 3
+        return bool(self.semver_pattern.match(version))
 
     def is_sha(self, version: str) -> bool:
         """Check if version string is a SHA hash."""
-        if len(version) != 40:
-            return False
-        return bool(re.match(r'^[a-f0-9]+$', version))
+        return bool(self.sha_pattern.match(version))
 
     def is_first_party_action(self, action_ref: str) -> bool:
         """Check if action is from a first-party/trusted organization."""
@@ -156,14 +165,15 @@ class GitHubActionsConverter:
             response = self.session.get(url)
 
             if response.status_code == 404:
-                print(f"Warning: Tag {tag} not found for {owner_repo}")
+                logger.warning("Tag %s not found for %s", tag, owner_repo)
                 return None
             elif response.status_code == 429:
-                print('Error: Rate limit exceeded')
+                logger.error("GitHub API rate limit exceeded")
                 sys.exit(1)
             elif response.status_code >= 400:
-                print(
-                    f"Error: API request failed with status {response.status_code}",
+                logger.error(
+                    "GitHub API request failed with status %d for %s@%s",
+                    response.status_code, owner_repo, tag
                 )
                 return None
 
@@ -183,6 +193,7 @@ class GitHubActionsConverter:
                     tag_data = tag_response.json()
                     sha = tag_data.get('object', {}).get('sha')
                 else:
+                    logger.warning("Failed to resolve annotated tag %s for %s", tag, owner_repo)
                     return None
             else:
                 # Direct commit reference
@@ -192,8 +203,10 @@ class GitHubActionsConverter:
                 self.cache[cache_key] = sha
                 return sha
 
+        except requests.exceptions.RequestException as e:
+            logger.error("GitHub API request failed for %s@%s: %s", owner_repo, tag, e)
         except Exception as e:
-            print(f"Error getting SHA for {owner_repo}@{tag}: {e}")
+            logger.error("Unexpected error getting SHA for %s@%s: %s", owner_repo, tag, e)
 
         return None
 
@@ -275,8 +288,11 @@ class GitHubActionsConverter:
             # Fall back to any version
             return sorted(matching_tags, reverse=True)[0]
 
+        except requests.exceptions.RequestException as e:
+            logger.error("GitHub API request failed for %s@%s: %s", owner_repo, sha, e)
+            return current_ref
         except Exception as e:
-            print(f"Error finding version for {owner_repo}@{sha}: {e}")
+            logger.error("Unexpected error finding version for %s@%s: %s", owner_repo, sha, e)
             return current_ref
 
     def process_file(self, file_path: Path) -> int:
@@ -288,43 +304,46 @@ class GitHubActionsConverter:
         Returns:
             Number of changes made
         """
-        print(f"\n\nProcessing file: {file_path}")
+        logger.info("Processing file: %s", file_path)
 
         try:
             content = file_path.read_text()
-        except Exception as e:
-            print(f"Error reading {file_path}: {e}")
+        except (OSError, IOError) as e:
+            logger.error("Error reading file %s: %s", file_path, e)
             return 0
 
-        # Find all action references
-        pattern = r'uses: ([^@\s]+)@([^\s#]+)(?:\s*#\s*([^\s]+))?'
-        matches = re.findall(pattern, content)
+        # Find all action references using pre-compiled pattern
+        matches = self.action_pattern.findall(content)
 
         if not matches:
+            logger.debug("No action references found in %s", file_path)
             return 0
 
         covered: set[str] = set()
         changes = 0
 
         for action_ref, version, comment_version in matches:
+            # Handle case where comment_version might be None
+            comment_version = comment_version or ""
+
             original_line = f"uses: {action_ref}@{version}"
             if comment_version:
                 original_line += f" # {comment_version}"
 
             if original_line in covered:
-                print(f"Skipping {original_line}, already processed")
+                logger.debug("Skipping %s, already processed", original_line)
                 continue
 
             covered.add(original_line)
 
             # Check if this is a first-party action that should be excluded
             if self.exclude_first_party and self.is_first_party_action(action_ref):
-                print(f"Skipping first-party action: {action_ref}")
+                logger.info("Skipping first-party action: %s", action_ref)
                 continue
 
             # Check if this action is allowlisted (should be excluded)
             if self.is_allowlisted(action_ref):
-                print(f"Skipping allowlisted action: {action_ref}")
+                logger.info("Skipping allowlisted action: %s", action_ref)
                 continue
 
             owner_repo = self.extract_owner_repo(action_ref)
@@ -341,7 +360,7 @@ class GitHubActionsConverter:
                     )
                     else 'needs conversion'
                 )
-                print(f"Found: {action_ref}@{version} ({status})")
+                logger.info("Found: %s@%s (%s)", action_ref, version, status)
                 continue
 
             # Determine the reference to use for SHA lookup
@@ -354,9 +373,9 @@ class GitHubActionsConverter:
                 and comment_version
                 and self.is_semver(comment_version)
             ):
-                print(
-                    f"{owner_repo}@{version} # {comment_version} "
-                    'already using SHA with semver, skipping',
+                logger.debug(
+                    "%s@%s # %s already using SHA with semver, skipping",
+                    owner_repo, version, comment_version
                 )
                 continue
 
@@ -365,11 +384,12 @@ class GitHubActionsConverter:
                 sha = version
             else:
                 if not self.token:
-                    print('Warning: No GitHub token provided, skipping API calls')
+                    logger.warning("No GitHub token provided, skipping API calls for %s", action_ref)
                     continue
 
                 sha = self.get_sha_for_tag(owner_repo, ref)
                 if not sha:
+                    logger.warning("Could not resolve SHA for %s@%s", owner_repo, ref)
                     continue
 
             # Find best version for comment
@@ -382,19 +402,19 @@ class GitHubActionsConverter:
 
             if original_line != new_line:
                 if self.dry_run_mode:
-                    print(f"Would update: '{original_line}' -> '{new_line}'")
+                    logger.info("Would update: '%s' -> '%s'", original_line, new_line)
                     changes += 1
                 else:
-                    print(f"Updating '{original_line}' -> '{new_line}'")
+                    logger.info("Updating '%s' -> '%s'", original_line, new_line)
                     content = content.replace(original_line, new_line)
                     changes += 1
 
         if changes > 0 and not self.discovery_mode and not self.dry_run_mode:
             try:
                 file_path.write_text(content)
-                print(f"Updated {file_path} with {changes} changes")
-            except Exception as e:
-                print(f"Error writing {file_path}: {e}")
+                logger.info("Updated %s with %d changes", file_path, changes)
+            except (OSError, IOError) as e:
+                logger.error("Error writing file %s: %s", file_path, e)
                 return 0
 
         return changes
@@ -411,18 +431,30 @@ class GitHubActionsConverter:
         yaml_files = self.find_yaml_files(base_path)
 
         if not yaml_files:
-            print('No YAML workflow or action files found')
+            logger.info('No YAML workflow or action files found in %s', base_path)
             return 0
 
         total_changes = 0
         for file_path in yaml_files:
-            total_changes += self.process_file(file_path)
+            try:
+                changes = self.process_file(file_path)
+                total_changes += changes
+            except Exception as e:
+                logger.error("Error processing file %s: %s", file_path, e)
+                # Continue processing other files
 
         return total_changes
 
 
 def main():
     """Main entry point for the pre-commit hook."""
+    # Set up logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s: %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
+
     parser = argparse.ArgumentParser(
         description='Convert GitHub Actions to use SHA-pinned versions',
     )
@@ -443,6 +475,11 @@ def main():
         '--discovery',
         action='store_true',
         help='Discovery mode: scan files but make no API calls or changes',
+    )
+    parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable verbose logging',
     )
     parser.add_argument(
         '--dry-run',
@@ -466,18 +503,22 @@ def main():
 
     args = parser.parse_args()
 
+    # Set up verbose logging if requested
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     # Get GitHub token
     token = args.token or os.environ.get('GITHUB_TOKEN')
 
     if args.discovery:
-        print('Discovery mode: scanning files without API calls or changes')
+        logger.info('Discovery mode: scanning files without API calls or changes')
         token = None
     elif not token:
         if args.dry_run:
-            print('Error: --dry-run requires a GitHub token', file=sys.stderr)
+            logger.error('--dry-run requires a GitHub token')
             sys.exit(1)
         else:
-            print('Warning: GITHUB_TOKEN not set. Limited functionality available.')
+            logger.warning('GITHUB_TOKEN not set. Limited functionality available.')
 
     # Parse allowlist if provided
     allowlist = []
@@ -493,8 +534,9 @@ def main():
                     for line in allowlist_content.split('\n')
                     if line.strip() and not line.strip().startswith('#')
                 ]
-                print(
-                    f"Loaded {len(allowlist)} patterns from allowlist file: {allowlist_path}",
+                logger.info(
+                    "Loaded %d patterns from allowlist file: %s",
+                    len(allowlist), allowlist_path
                 )
             else:
                 # Treat as comma-separated patterns
@@ -503,14 +545,15 @@ def main():
                     for pattern in args.allowlist.split(',')
                     if pattern.strip()
                 ]
-                print(
-                    f"Using {len(allowlist)} allowlist patterns from command line",
+                logger.info(
+                    "Using %d allowlist patterns from command line",
+                    len(allowlist)
                 )
 
             if allowlist:
-                print(f"Allowlist patterns: {allowlist}")
+                logger.debug("Allowlist patterns: %s", allowlist)
         except Exception as e:
-            print(f"Error processing allowlist: {e}")
+            logger.error("Error processing allowlist: %s", e)
             sys.exit(1)
 
     # Initialize converter
@@ -535,7 +578,7 @@ def main():
                     total_changes += changes
                     files_processed += 1
                 except Exception as e:
-                    print(f"Error processing {file_path}: {e}")
+                    logger.error("Error processing file %s: %s", file_path, e)
                     errors_encountered += 1
     else:
         # Process directories
@@ -554,23 +597,25 @@ def main():
                     # Count files in directory
                     files_processed += len(converter.find_yaml_files(path))
             except Exception as e:
-                print(f"Error processing {search_path}: {e}")
+                logger.error("Error processing %s: %s", search_path, e)
                 errors_encountered += 1
 
     # Print summary
     if args.discovery:
-        print(f"\n\nDiscovery complete: {files_processed} files scanned")
+        logger.info("Discovery complete: %d files scanned", files_processed)
     elif args.dry_run:
-        print(
-            f"\n\nDry run complete: {files_processed} files processed, {total_changes} potential changes",
+        logger.info(
+            "Dry run complete: %d files processed, %d potential changes",
+            files_processed, total_changes
         )
     else:
-        print(
-            f"\n\nProcessing complete: {files_processed} files processed, {total_changes} changes made",
+        logger.info(
+            "Processing complete: %d files processed, %d changes made",
+            files_processed, total_changes
         )
 
     if errors_encountered > 0:
-        print(f"Errors encountered: {errors_encountered}")
+        logger.warning("Errors encountered: %d", errors_encountered)
 
     # Exit code handling
     if errors_encountered > 0:
