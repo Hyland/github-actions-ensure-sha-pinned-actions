@@ -11,6 +11,13 @@ on:
     types:
       - submitted
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name || github.run_id }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+permissions:
+  contents: read
+
 jobs:
   pre-checks:
     # Trigger a run when approving a bot PR or as usual
