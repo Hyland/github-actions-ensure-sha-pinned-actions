@@ -288,7 +288,7 @@ class GitHubActionsConverter:
         Returns:
             Number of changes made
         """
-        print(f"\nProcessing file: {file_path}")
+        print(f"\n\nProcessing file: {file_path}")
 
         try:
             content = file_path.read_text()
@@ -559,14 +559,14 @@ def main():
 
     # Print summary
     if args.discovery:
-        print(f"\nDiscovery complete: {files_processed} files scanned")
+        print(f"\n\nDiscovery complete: {files_processed} files scanned")
     elif args.dry_run:
         print(
-            f"\nDry run complete: {files_processed} files processed, {total_changes} potential changes",
+            f"\n\nDry run complete: {files_processed} files processed, {total_changes} potential changes",
         )
     else:
         print(
-            f"\nProcessing complete: {files_processed} files processed, {total_changes} changes made",
+            f"\n\nProcessing complete: {files_processed} files processed, {total_changes} changes made",
         )
 
     if errors_encountered > 0:
