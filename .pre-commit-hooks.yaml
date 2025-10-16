@@ -1,7 +1,7 @@
 - id: gha-sha-convert
   name: GitHub Actions SHA Converter
   description: Convert GitHub Actions to use SHA-pinned versions
-  entry: python gha-sha-convert/gha_sha_convert.py
+  entry: python gha_sha_convert.py
   language: system
   files: ^\.github/(workflows|actions)/.*\.(yml|yaml)$
   pass_filenames: true
