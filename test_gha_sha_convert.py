@@ -77,22 +77,38 @@ class TestGitHubActionsConverter(unittest.TestCase):
             # Create test directory structure
             workflows_dir = tmp_path / '.github' / 'workflows'
             actions_dir = tmp_path / '.github' / 'actions'
+            my_action_dir = actions_dir / 'my-action'
             workflows_dir.mkdir(parents=True)
-            actions_dir.mkdir(parents=True)
+            my_action_dir.mkdir(parents=True)
 
-            # Create test files
-            (workflows_dir / 'test.yml').touch()
-            (workflows_dir / 'test.yaml').touch()
-            (actions_dir / 'action.yml').touch()
-            (tmp_path / 'other.yml').touch()  # Should not be found
+            # Create test files matching the new patterns
+            (workflows_dir / 'test.yml').touch()  # .github/workflows/*.yml
+            (workflows_dir / 'test.yaml').touch()  # .github/workflows/*.yaml
+            (my_action_dir / 'action.yml').touch()  # .github/actions/*/action.yml
+            (my_action_dir / 'action.yaml').touch()  # .github/actions/*/action.yaml
+            (tmp_path / 'action.yml').touch()  # root level action.yml
+            (tmp_path / 'action.yaml').touch()  # root level action.yaml
+
+            # Files that should NOT be found
+            (actions_dir / 'other.yml').touch()  # Direct in actions dir (not nested)
+            (tmp_path / 'other.yml').touch()  # Random YAML file
+            (my_action_dir / 'other.yml').touch()  # Wrong filename in action dir
 
             files = self.converter.find_yaml_files(tmp_path)
-            file_names = [f.name for f in files]
+            file_paths = [str(f.relative_to(tmp_path)) for f in files]
 
-            self.assertIn('test.yml', file_names)
-            self.assertIn('test.yaml', file_names)
-            self.assertIn('action.yml', file_names)
-            self.assertNotIn('other.yml', file_names)
+            # Should find these files
+            self.assertIn('.github/workflows/test.yml', file_paths)
+            self.assertIn('.github/workflows/test.yaml', file_paths)
+            self.assertIn('.github/actions/my-action/action.yml', file_paths)
+            self.assertIn('.github/actions/my-action/action.yaml', file_paths)
+            self.assertIn('action.yml', file_paths)
+            self.assertIn('action.yaml', file_paths)
+
+            # Should NOT find these files
+            self.assertNotIn('.github/actions/other.yml', file_paths)
+            self.assertNotIn('other.yml', file_paths)
+            self.assertNotIn('.github/actions/my-action/other.yml', file_paths)
 
     @patch('gha_sha_convert.requests.Session.get')
     def test_get_sha_for_tag_direct_commit(self, mock_get):

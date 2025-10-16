@@ -6,18 +6,15 @@ Converts GitHub Actions to use SHA-pinned versions for security.
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import yaml
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -71,10 +68,12 @@ class GitHubActionsConverter:
     def find_yaml_files(self, base_path: Path) -> list[Path]:
         """Find all YAML workflow and action files."""
         patterns = [
+            'action.yml',
+            'action.yaml',
             '.github/workflows/*.yml',
             '.github/workflows/*.yaml',
-            '.github/actions/*.yml',
-            '.github/actions/*.yaml',
+            '.github/actions/*/action.yml',
+            '.github/actions/*/action.yaml',
         ]
 
         files = []
@@ -165,15 +164,15 @@ class GitHubActionsConverter:
             response = self.session.get(url)
 
             if response.status_code == 404:
-                logger.warning("Tag %s not found for %s", tag, owner_repo)
+                logger.warning('Tag %s not found for %s', tag, owner_repo)
                 return None
             elif response.status_code == 429:
-                logger.error("GitHub API rate limit exceeded")
+                logger.error('GitHub API rate limit exceeded')
                 sys.exit(1)
             elif response.status_code >= 400:
                 logger.error(
-                    "GitHub API request failed with status %d for %s@%s",
-                    response.status_code, owner_repo, tag
+                    'GitHub API request failed with status %d for %s@%s',
+                    response.status_code, owner_repo, tag,
                 )
                 return None
 
@@ -193,7 +192,7 @@ class GitHubActionsConverter:
                     tag_data = tag_response.json()
                     sha = tag_data.get('object', {}).get('sha')
                 else:
-                    logger.warning("Failed to resolve annotated tag %s for %s", tag, owner_repo)
+                    logger.warning('Failed to resolve annotated tag %s for %s', tag, owner_repo)
                     return None
             else:
                 # Direct commit reference
@@ -204,9 +203,9 @@ class GitHubActionsConverter:
                 return sha
 
         except requests.exceptions.RequestException as e:
-            logger.error("GitHub API request failed for %s@%s: %s", owner_repo, tag, e)
+            logger.error('GitHub API request failed for %s@%s: %s', owner_repo, tag, e)
         except Exception as e:
-            logger.error("Unexpected error getting SHA for %s@%s: %s", owner_repo, tag, e)
+            logger.error('Unexpected error getting SHA for %s@%s: %s', owner_repo, tag, e)
 
         return None
 
@@ -289,10 +288,10 @@ class GitHubActionsConverter:
             return sorted(matching_tags, reverse=True)[0]
 
         except requests.exceptions.RequestException as e:
-            logger.error("GitHub API request failed for %s@%s: %s", owner_repo, sha, e)
+            logger.error('GitHub API request failed for %s@%s: %s', owner_repo, sha, e)
             return current_ref
         except Exception as e:
-            logger.error("Unexpected error finding version for %s@%s: %s", owner_repo, sha, e)
+            logger.error('Unexpected error finding version for %s@%s: %s', owner_repo, sha, e)
             return current_ref
 
     def process_file(self, file_path: Path) -> int:
@@ -304,19 +303,19 @@ class GitHubActionsConverter:
         Returns:
             Number of changes made
         """
-        logger.info("Processing file: %s", file_path)
+        logger.info('Processing file: %s', file_path)
 
         try:
             content = file_path.read_text()
-        except (OSError, IOError) as e:
-            logger.error("Error reading file %s: %s", file_path, e)
+        except OSError as e:
+            logger.error('Error reading file %s: %s', file_path, e)
             return 0
 
         # Find all action references using pre-compiled pattern
         matches = self.action_pattern.findall(content)
 
         if not matches:
-            logger.debug("No action references found in %s", file_path)
+            logger.debug('No action references found in %s', file_path)
             return 0
 
         covered: set[str] = set()
@@ -324,26 +323,26 @@ class GitHubActionsConverter:
 
         for action_ref, version, comment_version in matches:
             # Handle case where comment_version might be None
-            comment_version = comment_version or ""
+            comment_version = comment_version or ''
 
             original_line = f"uses: {action_ref}@{version}"
             if comment_version:
                 original_line += f" # {comment_version}"
 
             if original_line in covered:
-                logger.debug("Skipping %s, already processed", original_line)
+                logger.debug('Skipping %s, already processed', original_line)
                 continue
 
             covered.add(original_line)
 
             # Check if this is a first-party action that should be excluded
             if self.exclude_first_party and self.is_first_party_action(action_ref):
-                logger.info("Skipping first-party action: %s", action_ref)
+                logger.info('Skipping first-party action: %s', action_ref)
                 continue
 
             # Check if this action is allowlisted (should be excluded)
             if self.is_allowlisted(action_ref):
-                logger.info("Skipping allowlisted action: %s", action_ref)
+                logger.info('Skipping allowlisted action: %s', action_ref)
                 continue
 
             owner_repo = self.extract_owner_repo(action_ref)
@@ -360,7 +359,7 @@ class GitHubActionsConverter:
                     )
                     else 'needs conversion'
                 )
-                logger.info("Found: %s@%s (%s)", action_ref, version, status)
+                logger.info('Found: %s@%s (%s)', action_ref, version, status)
                 continue
 
             # Determine the reference to use for SHA lookup
@@ -374,8 +373,8 @@ class GitHubActionsConverter:
                 and self.is_semver(comment_version)
             ):
                 logger.debug(
-                    "%s@%s # %s already using SHA with semver, skipping",
-                    owner_repo, version, comment_version
+                    '%s@%s # %s already using SHA with semver, skipping',
+                    owner_repo, version, comment_version,
                 )
                 continue
 
@@ -384,12 +383,12 @@ class GitHubActionsConverter:
                 sha = version
             else:
                 if not self.token:
-                    logger.warning("No GitHub token provided, skipping API calls for %s", action_ref)
+                    logger.warning('No GitHub token provided, skipping API calls for %s', action_ref)
                     continue
 
                 sha = self.get_sha_for_tag(owner_repo, ref)
                 if not sha:
-                    logger.warning("Could not resolve SHA for %s@%s", owner_repo, ref)
+                    logger.warning('Could not resolve SHA for %s@%s', owner_repo, ref)
                     continue
 
             # Find best version for comment
@@ -412,9 +411,9 @@ class GitHubActionsConverter:
         if changes > 0 and not self.discovery_mode and not self.dry_run_mode:
             try:
                 file_path.write_text(content)
-                logger.info("Updated %s with %d changes", file_path, changes)
-            except (OSError, IOError) as e:
-                logger.error("Error writing file %s: %s", file_path, e)
+                logger.info('Updated %s with %d changes', file_path, changes)
+            except OSError as e:
+                logger.error('Error writing file %s: %s', file_path, e)
                 return 0
 
         return changes
@@ -440,7 +439,7 @@ class GitHubActionsConverter:
                 changes = self.process_file(file_path)
                 total_changes += changes
             except Exception as e:
-                logger.error("Error processing file %s: %s", file_path, e)
+                logger.error('Error processing file %s: %s', file_path, e)
                 # Continue processing other files
 
         return total_changes
@@ -452,7 +451,7 @@ def main():
     logging.basicConfig(
         level=logging.INFO,
         format='%(levelname)s: %(message)s',
-        handlers=[logging.StreamHandler()]
+        handlers=[logging.StreamHandler()],
     )
 
     parser = argparse.ArgumentParser(
@@ -535,8 +534,8 @@ def main():
                     if line.strip() and not line.strip().startswith('#')
                 ]
                 logger.info(
-                    "Loaded %d patterns from allowlist file: %s",
-                    len(allowlist), allowlist_path
+                    'Loaded %d patterns from allowlist file: %s',
+                    len(allowlist), allowlist_path,
                 )
             else:
                 # Treat as comma-separated patterns
@@ -546,14 +545,14 @@ def main():
                     if pattern.strip()
                 ]
                 logger.info(
-                    "Using %d allowlist patterns from command line",
-                    len(allowlist)
+                    'Using %d allowlist patterns from command line',
+                    len(allowlist),
                 )
 
             if allowlist:
-                logger.debug("Allowlist patterns: %s", allowlist)
+                logger.debug('Allowlist patterns: %s', allowlist)
         except Exception as e:
-            logger.error("Error processing allowlist: %s", e)
+            logger.error('Error processing allowlist: %s', e)
             sys.exit(1)
 
     # Initialize converter
@@ -578,7 +577,7 @@ def main():
                     total_changes += changes
                     files_processed += 1
                 except Exception as e:
-                    logger.error("Error processing file %s: %s", file_path, e)
+                    logger.error('Error processing file %s: %s', file_path, e)
                     errors_encountered += 1
     else:
         # Process directories
@@ -597,25 +596,25 @@ def main():
                     # Count files in directory
                     files_processed += len(converter.find_yaml_files(path))
             except Exception as e:
-                logger.error("Error processing %s: %s", search_path, e)
+                logger.error('Error processing %s: %s', search_path, e)
                 errors_encountered += 1
 
     # Print summary
     if args.discovery:
-        logger.info("Discovery complete: %d files scanned", files_processed)
+        logger.info('Discovery complete: %d files scanned', files_processed)
     elif args.dry_run:
         logger.info(
-            "Dry run complete: %d files processed, %d potential changes",
-            files_processed, total_changes
+            'Dry run complete: %d files processed, %d potential changes',
+            files_processed, total_changes,
         )
     else:
         logger.info(
-            "Processing complete: %d files processed, %d changes made",
-            files_processed, total_changes
+            'Processing complete: %d files processed, %d changes made',
+            files_processed, total_changes,
         )
 
     if errors_encountered > 0:
-        logger.warning("Errors encountered: %d", errors_encountered)
+        logger.warning('Errors encountered: %d', errors_encountered)
 
     # Exit code handling
     if errors_encountered > 0:
