@@ -46,19 +46,6 @@ inputs:
     required: false
     default: '.'
 
-outputs:
-  actions-found:
-    description: Number of action references found
-    value: ${{ steps.sha-convert.outputs.actions-found }}
-
-  actions-converted:
-    description: Number of actions that were converted to SHA format
-    value: ${{ steps.sha-convert.outputs.actions-converted }}
-
-  files-modified:
-    description: Number of files that were modified
-    value: ${{ steps.sha-convert.outputs.files-modified }}
-
 runs:
   using: composite
   steps:
@@ -104,18 +91,8 @@ runs:
 
         echo "$output"
 
-        # Extract statistics from output (if available)
-        actions_found=$(echo "$output" | grep -o "Found [0-9]\+ action references" | grep -o "[0-9]\+" || echo "0")
-        actions_converted=$(echo "$output" | grep -o "Converted [0-9]\+ actions" | grep -o "[0-9]\+" || echo "0")
-        files_modified=$(echo "$output" | grep -o "Modified [0-9]\+ files" | grep -o "[0-9]\+" || echo "0")
-
-        echo "actions-found=$actions_found" >> $GITHUB_OUTPUT
-        echo "actions-converted=$actions_converted" >> $GITHUB_OUTPUT
-        echo "files-modified=$files_modified" >> $GITHUB_OUTPUT
-
-        echo "=== Git diff of changes made === for $files_modified files and ${{ inputs.dry-run }}"
         # Show git diff if not in dry-run mode and changes were made
-        if [[ "${{ inputs.dry-run }}" != "true" ]] && [[ "$files_modified" -gt 0 ]]; then
+        if [[ "$exit_code" -eq 1 ]]; then
           echo ""
           echo "=== Git diff of changes made ==="
           git diff --color=always || echo "No changes to display (files may have been added/removed)"
