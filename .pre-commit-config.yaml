@@ -21,10 +21,6 @@ repos:
     rev: v1.7.8
     hooks:
       - id: actionlint
-  - repo: https://github.com/asottile/setup-cfg-fmt
-    rev: v3.1.0
-    hooks:
-    -   id: setup-cfg-fmt
   - repo: https://github.com/asottile/reorder-python-imports
     rev: v3.16.0
     hooks:
