@@ -63,17 +63,25 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
+        # Determine actual execution mode
+        actual_mode="normal"
+        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+          actual_mode="dry-run"
+        elif [[ "${{ inputs.dry-run }}" != "false" && "${{ inputs.discovery }}" == "true" ]]; then
+          actual_mode="discovery"
+        fi
+
         # Build command arguments
         args=()
         args+=("--path" "${{ inputs.path }}")
 
         # Handle dry-run mode (takes precedence over discovery)
-        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+        if [[ "$actual_mode" == "dry-run" ]]; then
           args+=("--dry-run")
-        elif [[ "${{ inputs.dry-run }}" == "false" ]]; then
+        elif [[ "$actual_mode" == "normal" && "${{ inputs.dry-run }}" == "false" ]]; then
           # Explicitly set to false - run in normal mode (ignore discovery)
           echo "Normal mode: dry-run explicitly set to false, ignoring discovery setting"
-        elif [[ "${{ inputs.discovery }}" == "true" ]]; then
+        elif [[ "$actual_mode" == "discovery" ]]; then
           args+=("--discovery")
         fi
 
@@ -95,8 +103,8 @@ runs:
 
         echo "$output"
 
-        # Show git diff only if actual changes were made (not in dry-run or discovery mode)
-        if [[ "$exit_code" -eq 1 && "${{ inputs.dry-run }}" != "true" && "${{ inputs.discovery }}" != "true" ]]; then
+        # Show git diff only if actual changes were made (normal mode)
+        if [[ "$exit_code" -eq 1 && "$actual_mode" == "normal" ]]; then
           echo ""
           echo "=== Git diff of changes made ==="
           git diff --color=always || echo "No changes to display (files may have been added/removed)"
