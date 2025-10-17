@@ -91,8 +91,8 @@ runs:
 
         echo "$output"
 
-        # Show git diff if not in dry-run mode and changes were made
-        if [[ "$exit_code" -eq 1 ]]; then
+        # Show git diff only if actual changes were made (not in dry-run or discovery mode)
+        if [[ "$exit_code" -eq 1 && "${{ inputs.dry-run }}" != "true" && "${{ inputs.discovery }}" != "true" ]]; then
           echo ""
           echo "=== Git diff of changes made ==="
           git diff --color=always || echo "No changes to display (files may have been added/removed)"
