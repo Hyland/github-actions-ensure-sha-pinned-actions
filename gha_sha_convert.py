@@ -44,6 +44,7 @@ class GitHubActionsConverter:
         self.allowlist = allowlist or []
         self.session = self._create_session()
         self.cache: dict[str, str] = {}
+        self.auth_failures = 0  # Track authentication failures
 
         # Pre-compile regex patterns for better performance
         self.action_pattern = re.compile(r'uses:\s*([^@\s]+)@([^\s#]+)(?:\s*#\s*([^\s]+))?')
@@ -166,6 +167,13 @@ class GitHubActionsConverter:
             if response.status_code == 404:
                 logger.warning('Tag %s not found for %s', tag, owner_repo)
                 return None
+            elif response.status_code == 401:
+                logger.error(
+                    'GitHub API authentication failed for %s@%s (status 401)',
+                    owner_repo, tag,
+                )
+                self.auth_failures += 1
+                return None
             elif response.status_code == 429:
                 logger.error('GitHub API rate limit exceeded')
                 sys.exit(1)
@@ -226,7 +234,14 @@ class GitHubActionsConverter:
             url = f"https://api.github.com/repos/{owner_repo}/tags"
             response = self.session.get(url)
 
-            if response.status_code != 200:
+            if response.status_code == 401:
+                logger.error(
+                    'GitHub API authentication failed for %s (status 401)',
+                    owner_repo,
+                )
+                self.auth_failures += 1
+                return current_ref
+            elif response.status_code != 200:
                 return current_ref
 
             tags = response.json()
@@ -616,8 +631,14 @@ def main():
     if errors_encountered > 0:
         logger.warning('Errors encountered: %d', errors_encountered)
 
+    if converter.auth_failures > 0:
+        logger.error(
+            'Authentication failures: %d (check GITHUB_TOKEN permissions)',
+            converter.auth_failures,
+        )
+
     # Exit code handling
-    if errors_encountered > 0:
+    if errors_encountered > 0 or converter.auth_failures > 0:
         sys.exit(2)  # Error exit code
     elif total_changes > 0 and not args.discovery and not args.dry_run:
         sys.exit(1)  # Changes made (pre-commit convention)

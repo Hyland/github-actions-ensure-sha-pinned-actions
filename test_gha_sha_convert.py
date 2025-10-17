@@ -163,6 +163,34 @@ class TestGitHubActionsConverter(unittest.TestCase):
         self.assertIsNone(sha)
 
     @patch('gha_sha_convert.requests.Session.get')
+    def test_get_sha_for_tag_auth_failure(self, mock_get):
+        """Test handling of authentication failure (401)."""
+        mock_response = Mock()
+        mock_response.status_code = 401
+        mock_get.return_value = mock_response
+
+        # Should increment auth_failures counter
+        initial_failures = self.converter.auth_failures
+        sha = self.converter.get_sha_for_tag('owner/repo', 'v1.0.0')
+
+        self.assertIsNone(sha)
+        self.assertEqual(self.converter.auth_failures, initial_failures + 1)
+
+    @patch('gha_sha_convert.requests.Session.get')
+    def test_find_best_version_for_sha_auth_failure(self, mock_get):
+        """Test handling of authentication failure in version lookup."""
+        mock_response = Mock()
+        mock_response.status_code = 401
+        mock_get.return_value = mock_response
+
+        # Should increment auth_failures counter and return current_ref
+        initial_failures = self.converter.auth_failures
+        result = self.converter.find_best_version_for_sha('owner/repo', 'a' * 40, 'v1.0.0')
+
+        self.assertEqual(result, 'v1.0.0')  # Should return current_ref
+        self.assertEqual(self.converter.auth_failures, initial_failures + 1)
+
+    @patch('gha_sha_convert.requests.Session.get')
     def test_find_best_version_for_sha(self, mock_get):
         """Test finding best semantic version for a SHA."""
         mock_response = Mock()
@@ -335,6 +363,7 @@ class TestMainFunction(unittest.TestCase):
         mock_converter.discovery_mode = False
         mock_converter.dry_run_mode = False
         mock_converter.exclude_first_party = False
+        mock_converter.auth_failures = 0  # Add auth_failures attribute
         mock_converter_class.return_value = mock_converter
 
         with patch('os.environ.get', return_value='fake-token'):
@@ -355,6 +384,7 @@ class TestMainFunction(unittest.TestCase):
         """Test main function with specific files."""
         mock_converter = Mock()
         mock_converter.process_file.return_value = 1
+        mock_converter.auth_failures = 0  # Add auth_failures attribute
         mock_converter_class.return_value = mock_converter
 
         # Create a temporary test file
@@ -481,6 +511,7 @@ jobs:
             mock_converter = Mock()
             mock_converter.find_yaml_files.return_value = []
             mock_converter.process_directory.return_value = 0
+            mock_converter.auth_failures = 0  # Add auth_failures attribute
             mock_converter_class.return_value = mock_converter
 
             from gha_sha_convert import main
@@ -494,6 +525,44 @@ jobs:
             mock_converter_class.assert_called_once_with(
                 token=None, force=False, allowlist=[],
             )
+
+    @patch('sys.argv', ['gha_sha_convert.py', '--dry-run'])
+    def test_main_auth_failure_exit_code(self):
+        """Test main function exits with code 2 when authentication failures occur."""
+        with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
+            mock_converter = Mock()
+            mock_converter.find_yaml_files.return_value = []
+            mock_converter.process_directory.return_value = 0
+            mock_converter.auth_failures = 3  # Simulate authentication failures
+            mock_converter_class.return_value = mock_converter
+
+            with patch('os.environ.get', return_value='fake-token'):
+                from gha_sha_convert import main
+
+                with self.assertRaises(SystemExit) as cm:
+                    main()
+
+                # Should exit with 2 for authentication failures
+                self.assertEqual(cm.exception.code, 2)
+
+    @patch('sys.argv', ['gha_sha_convert.py'])
+    def test_main_combined_errors_exit_code(self):
+        """Test main function exits with code 2 when both file errors and auth failures occur."""
+        with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
+            mock_converter = Mock()
+            mock_converter.find_yaml_files.return_value = []
+            mock_converter.process_directory.side_effect = Exception('File error')
+            mock_converter.auth_failures = 1  # Also has auth failures
+            mock_converter_class.return_value = mock_converter
+
+            with patch('os.environ.get', return_value='fake-token'):
+                from gha_sha_convert import main
+
+                with self.assertRaises(SystemExit) as cm:
+                    main()
+
+                # Should exit with 2 for errors (either type)
+                self.assertEqual(cm.exception.code, 2)
 
     def test_is_allowlisted(self):
         """Test allowlist pattern matching."""
