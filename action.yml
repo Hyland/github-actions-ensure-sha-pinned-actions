@@ -18,19 +18,19 @@ inputs:
     required: false
     default: 'false'
 
-  dry-run:
-    description: |
-      When set to 'true', only reports what would be changed without making modifications.
-      Useful for validation or reporting purposes.
-    required: false
-    default: 'false'
-
   discovery:
     description: |
       When set to 'true', only discovers and lists actions without making API calls.
       Faster execution but won't provide SHA conversion information.
     required: false
-    default: 'false'
+    default: 'true'
+
+  dry-run:
+    description: |
+      When set to 'true', only reports what would be changed without making modifications.
+      Useful for validation or reporting purposes.
+    required: false
+    default: 'true'
 
   github-token:
     description: |
