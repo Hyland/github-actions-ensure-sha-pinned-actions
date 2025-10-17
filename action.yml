@@ -28,9 +28,9 @@ inputs:
 
   dry-run:
     description: |
-      When set to 'true', reports what would be changed without making modifications.
-      Takes precedence over discovery mode. Requires GitHub token for API calls.
-      If no token is available, automatically falls back to discovery mode.
+      Controls execution mode. When 'true', reports what would be changed without
+      making modifications. When 'false', makes actual file changes. Takes precedence
+      over discovery mode. Requires GitHub token for API calls unless falling back.
     required: false
     default: 'true'
 
@@ -67,11 +67,13 @@ runs:
         args=()
         args+=("--path" "${{ inputs.path }}")
 
+        # Handle dry-run mode (takes precedence over discovery)
         if [[ "${{ inputs.dry-run }}" == "true" ]]; then
           args+=("--dry-run")
-        fi
-
-        if [[ "${{ inputs.discovery }}" == "true" ]]; then
+        elif [[ "${{ inputs.dry-run }}" == "false" ]]; then
+          # Explicitly set to false - run in normal mode (ignore discovery)
+          echo "Normal mode: dry-run explicitly set to false, ignoring discovery setting"
+        elif [[ "${{ inputs.discovery }}" == "true" ]]; then
           args+=("--discovery")
         fi
 

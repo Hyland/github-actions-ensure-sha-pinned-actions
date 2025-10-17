@@ -527,7 +527,7 @@ def main():
     # Get GitHub token
     token = args.token or os.environ.get('GITHUB_TOKEN')
 
-    # Handle mode selection logic (dry-run takes precedence over discovery)
+    # Handle mode selection logic
     actual_mode = None
     if args.dry_run and not token:
         # If dry-run is requested but no token available, fall back to discovery mode
@@ -545,6 +545,9 @@ def main():
         token = None
     elif not token:
         logger.warning('GITHUB_TOKEN not set. Limited functionality available.')
+        actual_mode = 'normal'
+    else:
+        # Normal mode with token
         actual_mode = 'normal'
 
     # Parse allowlist if provided
