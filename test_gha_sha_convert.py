@@ -451,10 +451,10 @@ jobs:
 
             changes = self.converter.process_file(Path(tmp_file.name))
 
-            # Discovery mode should not make any changes
-            self.assertEqual(changes, 0)
+            # Discovery mode should return count of validation issues found
+            self.assertEqual(changes, 1)  # Found 1 action needing conversion
 
-            # File content should remain unchanged
+            # File content should remain unchanged in discovery mode
             updated_content = Path(tmp_file.name).read_text()
             self.assertEqual(updated_content, test_content)
 
@@ -505,13 +505,13 @@ jobs:
             os.unlink(tmp_file.name)
 
     @patch('sys.argv', ['gha_sha_convert.py', '--discovery'])
-    def test_main_discovery_mode(self):
-        """Test main function with discovery mode."""
+    def test_main_discovery_mode_no_issues(self):
+        """Test main function with discovery mode when no issues are found."""
         with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
             mock_converter = Mock()
             mock_converter.find_yaml_files.return_value = []
-            mock_converter.process_directory.return_value = 0
-            mock_converter.auth_failures = 0  # Add auth_failures attribute
+            mock_converter.process_directory.return_value = 0  # No issues found
+            mock_converter.auth_failures = 0
             mock_converter_class.return_value = mock_converter
 
             from gha_sha_convert import main
@@ -519,8 +519,30 @@ jobs:
             with self.assertRaises(SystemExit) as cm:
                 main()
 
-            # Should exit with 0 for discovery mode
+            # Should exit with 0 for discovery mode with no issues
             self.assertEqual(cm.exception.code, 0)
+            # Should be called with no token in discovery mode
+            mock_converter_class.assert_called_once_with(
+                token=None, force=False, allowlist=[],
+            )
+
+    @patch('sys.argv', ['gha_sha_convert.py', '--discovery'])
+    def test_main_discovery_mode_with_issues(self):
+        """Test main function with discovery mode when validation issues are found."""
+        with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
+            mock_converter = Mock()
+            mock_converter.find_yaml_files.return_value = []
+            mock_converter.process_directory.return_value = 3  # Issues found
+            mock_converter.auth_failures = 0
+            mock_converter_class.return_value = mock_converter
+
+            from gha_sha_convert import main
+
+            with self.assertRaises(SystemExit) as cm:
+                main()
+
+            # Should exit with 1 for discovery mode with validation issues
+            self.assertEqual(cm.exception.code, 1)
             # Should be called with no token in discovery mode
             mock_converter_class.assert_called_once_with(
                 token=None, force=False, allowlist=[],
@@ -611,7 +633,7 @@ jobs:
 
             # Should process only the non-allowlisted action
             changes = converter.process_file(Path(temp_file))
-            self.assertEqual(changes, 0)  # Discovery mode makes no changes
+            self.assertEqual(changes, 1)  # Discovery mode: 1 validation issue found (my-org/custom-action)
 
             # Test the actual allowlist behavior by checking output
             # The allowlisted action should be skipped
