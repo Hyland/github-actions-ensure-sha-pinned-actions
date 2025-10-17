@@ -527,20 +527,25 @@ def main():
     # Get GitHub token
     token = args.token or os.environ.get('GITHUB_TOKEN')
 
-    # Handle mode selection logic
-    if args.discovery:
-        logger.info('Discovery mode: scanning files without API calls or changes')
-        token = None
-    elif args.dry_run and not token:
+    # Handle mode selection logic (dry-run takes precedence over discovery)
+    actual_mode = None
+    if args.dry_run and not token:
         # If dry-run is requested but no token available, fall back to discovery mode
         logger.info('Dry-run mode requested but no GitHub token available, falling back to discovery mode')
         args.discovery = True
+        actual_mode = 'discovery_fallback'
         token = None
     elif args.dry_run and token:
         # Dry-run mode with token available
         logger.info('Dry-run mode: making API calls but no file changes')
+        actual_mode = 'dry_run'
+    elif args.discovery:
+        logger.info('Discovery mode: scanning files without API calls or changes')
+        actual_mode = 'discovery'
+        token = None
     elif not token:
         logger.warning('GITHUB_TOKEN not set. Limited functionality available.')
+        actual_mode = 'normal'
 
     # Parse allowlist if provided
     allowlist = []
@@ -622,10 +627,10 @@ def main():
                 logger.error('Error processing %s: %s', search_path, e)
                 errors_encountered += 1
 
-    # Print summary
-    if args.discovery:
+    # Print summary based on actual mode used
+    if actual_mode in ('discovery', 'discovery_fallback'):
         logger.info('Discovery complete: %d files scanned', files_processed)
-    elif args.dry_run:
+    elif actual_mode == 'dry_run':
         logger.info(
             'Dry run complete: %d files processed, %d potential changes',
             files_processed, total_changes,
