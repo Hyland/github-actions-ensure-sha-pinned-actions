@@ -22,13 +22,15 @@ inputs:
     description: |
       When set to 'true', only discovers and lists actions without making API calls.
       Faster execution but won't provide SHA conversion information.
+      Takes precedence over dry-run mode.
     required: false
     default: 'true'
 
   dry-run:
     description: |
-      When set to 'true', only reports what would be changed without making modifications.
-      Useful for validation or reporting purposes.
+      When set to 'true', reports what would be changed without making modifications.
+      Requires GitHub token for API calls. If no token is available, automatically
+      falls back to discovery mode. Useful for validation or reporting purposes.
     required: false
     default: 'true'
 

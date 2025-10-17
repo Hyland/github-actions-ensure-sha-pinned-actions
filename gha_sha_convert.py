@@ -527,15 +527,20 @@ def main():
     # Get GitHub token
     token = args.token or os.environ.get('GITHUB_TOKEN')
 
+    # Handle mode selection logic
     if args.discovery:
         logger.info('Discovery mode: scanning files without API calls or changes')
         token = None
+    elif args.dry_run and not token:
+        # If dry-run is requested but no token available, fall back to discovery mode
+        logger.info('Dry-run mode requested but no GitHub token available, falling back to discovery mode')
+        args.discovery = True
+        token = None
+    elif args.dry_run and token:
+        # Dry-run mode with token available
+        logger.info('Dry-run mode: making API calls but no file changes')
     elif not token:
-        if args.dry_run:
-            logger.error('--dry-run requires a GitHub token')
-            sys.exit(1)
-        else:
-            logger.warning('GITHUB_TOKEN not set. Limited functionality available.')
+        logger.warning('GITHUB_TOKEN not set. Limited functionality available.')
 
     # Parse allowlist if provided
     allowlist = []
