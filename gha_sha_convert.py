@@ -643,12 +643,12 @@ def main():
     # Exit code handling
     if errors_encountered > 0 or converter.auth_failures > 0:
         sys.exit(2)  # Error exit code
-    elif total_changes > 0 and not args.dry_run:
-        # In discovery mode, exit 1 if validation issues found
-        # In normal mode, exit 1 if changes were made
-        sys.exit(1)  # Changes made or validation issues found (pre-commit convention)
+    elif total_changes > 0:
+        # Exit 1 if changes are needed (discovery mode, dry-run mode, or normal mode)
+        # This indicates non-compliance and should fail CI/pre-commit checks
+        sys.exit(1)  # Changes needed or validation issues found (pre-commit convention)
     else:
-        sys.exit(0)  # Success
+        sys.exit(0)  # Success - no changes needed
 
 
 if __name__ == '__main__':
