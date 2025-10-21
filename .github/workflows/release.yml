@@ -56,7 +56,7 @@ jobs:
         if: ${{ steps.set-release-level.outputs.release-level != '' }}
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          if [[ "$LATEST_TAG" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-.+)?$ ]]; then
+          if [[ "$LATEST_TAG" =~ "^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-.+)?$" ]]; then
             MAJOR="${BASH_REMATCH[1]}"
             MINOR="${BASH_REMATCH[2]}"
             PATCH="${BASH_REMATCH[3]}"
