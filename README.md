@@ -261,4 +261,4 @@ To create a new release, simply merge a PR that is labelled with either `release
   repository layout, or if users are required to change their workflow config
   when upgrading to the new version of an existing action.
 
-Alternatively, you can run the [release workflow](https://github.com/Alfresco/automate-build-tools/actions/workflows/release.yml) manually, specifying the desired release type.
+Alternatively, you can run the [release workflow](https://github.com/hyland/github-actions-ensure-sha-pinned-actions/actions/workflows/release.yml) manually, specifying the desired release type.
