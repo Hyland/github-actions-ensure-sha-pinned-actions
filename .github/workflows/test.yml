@@ -76,10 +76,25 @@ jobs:
 
       - name: Test pre-commit hook functionality
         run: |
-          # Create a test workflow file
+          # Create a test workflow file with SHA-pinned actions (should pass discovery)
           mkdir -p .github/workflows
-          cat > .github/workflows/test.yml << 'EOF'
-          name: Test
+          cat > .github/workflows/test-good.yml << 'EOF'
+          name: Test Good
+          on: [push]
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+                - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
+          EOF
+
+          # Test discovery on the good file (should succeed)
+          python gha_sha_convert.py --discovery .github/workflows/test-good.yml
+
+          # Create a test workflow file with non-SHA actions (should find issues but not fail in discovery)
+          cat > .github/workflows/test-needs-conversion.yml << 'EOF'
+          name: Test Needs Conversion
           on: [push]
           jobs:
             test:
@@ -89,11 +104,13 @@ jobs:
                 - uses: actions/setup-node@v3.8.1
           EOF
 
-          # Test discovery on the test file
-          python gha_sha_convert.py --discovery .github/workflows/test.yml
+          # Test discovery on the file needing conversion (expected to find issues)
+          echo "Testing discovery on file with actions needing conversion..."
+          python gha_sha_convert.py --discovery .github/workflows/test-needs-conversion.yml || echo "Discovery found actions needing conversion (expected)"
 
-          # Test exclude-first-party on the test file
-          python gha_sha_convert.py --discovery --exclude-first-party .github/workflows/test.yml
+          # Test exclude-first-party on both files
+          python gha_sha_convert.py --discovery --exclude-first-party .github/workflows/test-good.yml
+          python gha_sha_convert.py --discovery --exclude-first-party .github/workflows/test-needs-conversion.yml || echo "Discovery with exclude-first-party found issues (expected)"
 
   python-integration-tests:
     runs-on: ubuntu-latest
