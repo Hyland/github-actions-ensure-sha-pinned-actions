@@ -53,53 +53,61 @@ runs:
   steps:
     - name: Install Python dependencies
       shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
       run: |
         python -m pip install --upgrade pip
-        pip install -r ${{ github.action_path }}/requirements.txt
+        pip install -r "$ACTION_PATH/requirements.txt"
 
     - name: Run GitHub Actions SHA Converter
       id: sha-convert
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_DRY_RUN: ${{ inputs.dry-run }}
+        INPUT_DISCOVERY: ${{ inputs.discovery }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_EXCLUDE_FIRST_PARTY: ${{ inputs.exclude-first-party }}
+        INPUT_ALLOWLIST: ${{ inputs.allowlist }}
       run: |
         # Determine actual execution mode
         actual_mode="normal"
-        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+        if [[ "$INPUT_DRY_RUN" == "true" ]]; then
           actual_mode="dry-run"
-        elif [[ "${{ inputs.dry-run }}" != "false" && "${{ inputs.discovery }}" == "true" ]]; then
+        elif [[ "$INPUT_DRY_RUN" != "false" && "$INPUT_DISCOVERY" == "true" ]]; then
           actual_mode="discovery"
         fi
 
         # Build command arguments
         args=()
-        args+=("--path" "${{ inputs.path }}")
+        args+=("--path" "$INPUT_PATH")
 
         # Handle dry-run mode (takes precedence over discovery)
         if [[ "$actual_mode" == "dry-run" ]]; then
           args+=("--dry-run")
-        elif [[ "$actual_mode" == "normal" && "${{ inputs.dry-run }}" == "false" ]]; then
+        elif [[ "$actual_mode" == "normal" && "$INPUT_DRY_RUN" == "false" ]]; then
           # Explicitly set to false - run in normal mode (ignore discovery)
           echo "Normal mode: dry-run explicitly set to false, ignoring discovery setting"
         elif [[ "$actual_mode" == "discovery" ]]; then
           args+=("--discovery")
         fi
 
-        if [[ "${{ inputs.exclude-first-party }}" == "true" ]]; then
+        if [[ "$INPUT_EXCLUDE_FIRST_PARTY" == "true" ]]; then
           args+=("--exclude-first-party")
         fi
 
         # Handle allowlist - write to temp file if provided
-        if [[ -n "${{ inputs.allowlist }}" ]]; then
+        if [[ -n "$INPUT_ALLOWLIST" ]]; then
           allowlist_file=$(mktemp)
-          echo '${{ inputs.allowlist }}' > "$allowlist_file"
+          printf '%s\n' "$INPUT_ALLOWLIST" > "$allowlist_file"
           args+=("--allowlist" "$allowlist_file")
         fi
 
-        echo "Running: python ${{ github.action_path }}/gha_sha_convert.py ${args[*]}"
+        echo "Running: python $ACTION_PATH/gha_sha_convert.py ${args[*]}"
 
         # Capture output and statistics
-        output=$(python ${{ github.action_path }}/gha_sha_convert.py "${args[@]}" 2>&1) || exit_code=$?
+        output=$(python "$ACTION_PATH/gha_sha_convert.py" "${args[@]}" 2>&1) || exit_code=$?
 
         echo "$output"
 
@@ -112,7 +120,7 @@ runs:
         fi
 
         # Clean up temp file if created
-        if [[ -n "${{ inputs.allowlist }}" ]]; then
+        if [[ -n "$INPUT_ALLOWLIST" ]]; then
           rm -f "$allowlist_file"
         fi
 
