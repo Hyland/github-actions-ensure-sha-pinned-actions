@@ -153,7 +153,7 @@ python -m pip install -U --user pre-commit
 pre-commit install
 ```
 
-To run unit tests (no connection to a remote Jira server should be needed):
+To run unit tests for the GitHub Actions SHA converter (no network connection required):
 
 ```bash
 python -m unittest test_gha_sha_convert -v
