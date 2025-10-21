@@ -1,6 +1,6 @@
 name: GitHub Actions Ensure SHA Pinned Actions
 description: Ensures all GitHub Actions use SHA-pinned versions instead of tag references
-author: Alfresco
+author: Hyland Software, Inc. and its affiliates
 
 inputs:
   allowlist:

@@ -35,7 +35,7 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: Alfresco/alfresco-build-tools/.github/actions/github-actions-ensure-sha-pinned-actions@ref
+  uses: hyland/github-actions-ensure-sha-pinned-actions@ref
 ```
 
 **With Allowlist:**
