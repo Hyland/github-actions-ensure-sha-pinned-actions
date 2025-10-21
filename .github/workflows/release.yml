@@ -54,6 +54,8 @@ jobs:
       - name: Get latest tag and bump version
         id: bump-semver
         if: ${{ steps.set-release-level.outputs.release-level != '' }}
+        env:
+          RELEASE_LEVEL: ${{ steps.set-release-level.outputs.release-level }}
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           if [[ "$LATEST_TAG" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-.+)?$ ]]; then
@@ -67,7 +69,7 @@ jobs:
           fi
 
           # Bump version based on release level
-          case "${{ steps.set-release-level.outputs.release-level }}" in
+          case "$RELEASE_LEVEL" in
             major)
               MAJOR=$((MAJOR + 1))
               MINOR=0
@@ -87,15 +89,18 @@ jobs:
 
       - name: Create and push tag
         if: ${{ steps.set-release-level.outputs.release-level != '' }}
+        env:
+          NEW_VERSION: ${{ steps.bump-semver.outputs.new-version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git tag -a "${{ steps.bump-semver.outputs.new-version }}" -m "Release ${{ steps.bump-semver.outputs.new-version }}"
-          git push origin "${{ steps.bump-semver.outputs.new-version }}"
+          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+          git push origin "$NEW_VERSION"
 
       - name: Generate release notes
         if: ${{ steps.set-release-level.outputs.release-level != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ steps.bump-semver.outputs.new-version }}" --generate-notes -t "${{ steps.bump-semver.outputs.new-version }}"
+          NEW_VERSION: ${{ steps.bump-semver.outputs.new-version }}
+        run: gh release create "$NEW_VERSION" --generate-notes -t "$NEW_VERSION"
