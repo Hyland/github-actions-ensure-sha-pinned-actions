@@ -481,9 +481,6 @@ def main():
         help='Force conversion even if already using SHA',
     )
     parser.add_argument(
-        '--token', help='GitHub token (default: GITHUB_TOKEN environment variable)',
-    )
-    parser.add_argument(
         '--path',
         action='append',
         help='Path to search for workflow files (can be specified multiple times)',
@@ -524,8 +521,8 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    # Get GitHub token
-    token = args.token or os.environ.get('GITHUB_TOKEN')
+    # Get GitHub token from environment only for security
+    token = os.environ.get('GITHUB_TOKEN')
 
     # Handle mode selection logic
     actual_mode = None

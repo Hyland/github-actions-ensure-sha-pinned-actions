@@ -21,6 +21,7 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 - Ensures reproducible builds with exact action versions
 - Maintains clear audit trail of action versions
 - Preserves human-readable version information in comments
+- Secure token handling via environment variables only (no command-line exposure)
 
 ## Table of Contents
 
@@ -103,7 +104,6 @@ repos:
 #### Arguments
 
 - `--force`: Force conversion even if reference already uses SHA with semver comment
-- `--token TOKEN`: Specify GitHub token (alternative to environment variable)
 
 Example with force flag:
 
@@ -192,16 +192,13 @@ python gha_sha_convert.py --force
 python gha_sha_convert.py --discovery
 
 # Dry run mode - show what would be changed
-python gha_sha_convert.py --dry-run --token YOUR_TOKEN
+python gha_sha_convert.py --dry-run
 
 # Exclude first-party actions from conversion
 python gha_sha_convert.py --exclude-first-party
 
 # Process specific directory paths
 python gha_sha_convert.py --path .github/workflows --path .github/actions
-
-# Use custom token
-python gha_sha_convert.py --token YOUR_GITHUB_TOKEN
 ```
 
 Environment Variables:
@@ -211,7 +208,6 @@ Environment Variables:
 Command Line Options:
 
 - `--force`: Force re-processing of already converted actions
-- `--token TOKEN`: Specify GitHub token directly (alternative to environment variable)
 - `--path PATH`: Specify custom search paths (can be used multiple times)
 - `--discovery`: Discovery mode - scan files without making API calls or changes
 - `--dry-run`: Dry run mode - make API calls but don't modify files (requires token)
@@ -244,7 +240,8 @@ The hook handles various error conditions gracefully:
 
 ### Security Considerations
 
-- Requires GitHub token - store securely in environment
+- Requires GitHub token - store securely as environment variable only
+- Token must be provided via `GITHUB_TOKEN` environment variable for security
 - Only fetches from GitHub's official API
 - Validates SHA format before updating files
 - Preserves file permissions and encoding
