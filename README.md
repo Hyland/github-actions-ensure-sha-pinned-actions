@@ -118,7 +118,7 @@ Example with force flag:
 
 ### Requirements
 
-- Python 3.9+
+- Python 3.10+ (3.10-3.14 supported)
 - GitHub token with `repo` scope
 - Internet connection (for GitHub API calls)
 
