@@ -216,6 +216,15 @@ class GitHubActionsConverter:
                 )
                 self.auth_failures += 1
                 return current_ref
+            elif response.status_code == 429:
+                logger.error('GitHub API rate limit exceeded')
+                sys.exit(1)
+            elif response.status_code >= 400:
+                logger.error(
+                    'GitHub API request failed with status %d for %s',
+                    response.status_code, owner_repo,
+                )
+                return current_ref
             elif response.status_code != 200:
                 return current_ref
 
