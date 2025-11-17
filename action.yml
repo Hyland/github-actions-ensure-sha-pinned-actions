@@ -67,16 +67,23 @@ runs:
         args=()
         args+=("--path" "$INPUT_PATH")
 
+        # Determine the actual mode for later use
         if [[ "$INPUT_DRY_RUN" == "true" ]]; then
           # Dry-run mode takes precedence
           args+=("--dry-run")
+          actual_mode="dry-run"
         elif [[ "$INPUT_DRY_RUN" == "false" ]]; then
           # Normal mode: dry-run explicitly set to false, ignore discovery
           echo "Normal mode: dry-run explicitly set to false, ignoring discovery setting"
           # No extra arg needed for normal mode
+          actual_mode="normal"
         elif [[ "$INPUT_DISCOVERY" == "true" ]]; then
           # Discovery mode if not dry-run
           args+=("--discovery")
+          actual_mode="discovery"
+        else
+          # Default mode (normal)
+          actual_mode="normal"
         fi
 
         # Handle allowlist - write to temp file if provided
