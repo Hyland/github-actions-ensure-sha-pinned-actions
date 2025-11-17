@@ -26,7 +26,7 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 ## Table of Contents
 
 - [GitHub Action](#github-action)
-- [Precommit Hook](#precommit-hook)
+- [Pre-commit Hook](#precommit-hook)
 - [Development](#development)
 - [Release](#release)
 
