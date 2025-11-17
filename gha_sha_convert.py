@@ -278,7 +278,7 @@ class GitHubActionsConverter:
                         while len(parts) < 3:
                             parts.append(0)
                         return tuple(parts)
-                    except Exception:
+                    except ValueError:
                         return (0, 0, 0)
 
                 return sorted(semver_tags, key=version_key, reverse=True)[0]
