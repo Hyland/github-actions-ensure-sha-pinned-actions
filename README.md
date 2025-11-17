@@ -60,7 +60,6 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
     allowlist: |
       actions/checkout@*
       actions/setup-*
-    exclude-first-party: "true"
     dry-run: "true"
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -194,9 +193,6 @@ python gha_sha_convert.py --discovery
 # Dry run mode - show what would be changed
 python gha_sha_convert.py --dry-run
 
-# Exclude first-party actions from conversion
-python gha_sha_convert.py --exclude-first-party
-
 # Process specific directory paths
 python gha_sha_convert.py --path .github/workflows --path .github/actions
 ```
@@ -211,7 +207,6 @@ Command Line Options:
 - `--path PATH`: Specify custom search paths (can be used multiple times)
 - `--discovery`: Discovery mode - scan files without making API calls or changes
 - `--dry-run`: Dry run mode - make API calls but don't modify files (requires token)
-- `--exclude-first-party`: Exclude first-party actions from conversion (actions/, microsoft/, azure/, etc.)
 
 GitHub Token Setup:
 

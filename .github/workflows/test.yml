@@ -70,10 +70,6 @@ jobs:
           echo "Testing discovery mode on current repository..."
           python gha_sha_convert.py --discovery --path . || echo "Discovery mode completed (may have found actions needing conversion)"
 
-          # Test with exclude-first-party in discovery mode - should find fewer or no issues
-          echo "Testing discovery mode with exclude-first-party..."
-          python gha_sha_convert.py --discovery --exclude-first-party --path . || echo "Discovery with exclude-first-party completed (may have found third-party actions needing conversion)"
-
           # Test syntax validation
           python -m py_compile gha_sha_convert.py
           python -m py_compile test_gha_sha_convert.py
@@ -111,10 +107,6 @@ jobs:
           # Test discovery on the file needing conversion (expected to find issues)
           echo "Testing discovery on file with actions needing conversion..."
           python gha_sha_convert.py --discovery .github/workflows/test-needs-conversion.yml || echo "Discovery found actions needing conversion (expected)"
-
-          # Test exclude-first-party on both files
-          python gha_sha_convert.py --discovery --exclude-first-party .github/workflows/test-good.yml
-          python gha_sha_convert.py --discovery --exclude-first-party .github/workflows/test-needs-conversion.yml || echo "Discovery with exclude-first-party found issues (expected)"
 
   python-integration-tests:
     runs-on: ubuntu-latest

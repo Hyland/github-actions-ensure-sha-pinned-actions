@@ -362,7 +362,6 @@ class TestMainFunction(unittest.TestCase):
         mock_converter.find_yaml_files.return_value = []
         mock_converter.discovery_mode = False
         mock_converter.dry_run_mode = False
-        mock_converter.exclude_first_party = False
         mock_converter.auth_failures = 0  # Add auth_failures attribute
         mock_converter_class.return_value = mock_converter
 
