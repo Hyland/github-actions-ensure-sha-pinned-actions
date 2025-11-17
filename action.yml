@@ -71,25 +71,19 @@ runs:
         INPUT_EXCLUDE_FIRST_PARTY: ${{ inputs.exclude-first-party }}
         INPUT_ALLOWLIST: ${{ inputs.allowlist }}
       run: |
-        # Determine actual execution mode
-        actual_mode="normal"
-        if [[ "$INPUT_DRY_RUN" == "true" ]]; then
-          actual_mode="dry-run"
-        elif [[ "$INPUT_DRY_RUN" != "false" && "$INPUT_DISCOVERY" == "true" ]]; then
-          actual_mode="discovery"
-        fi
-
-        # Build command arguments
+        # Determine execution mode and build command arguments
         args=()
         args+=("--path" "$INPUT_PATH")
 
-        # Handle dry-run mode (takes precedence over discovery)
-        if [[ "$actual_mode" == "dry-run" ]]; then
+        if [[ "$INPUT_DRY_RUN" == "true" ]]; then
+          # Dry-run mode takes precedence
           args+=("--dry-run")
-        elif [[ "$actual_mode" == "normal" && "$INPUT_DRY_RUN" == "false" ]]; then
-          # Explicitly set to false - run in normal mode (ignore discovery)
+        elif [[ "$INPUT_DRY_RUN" == "false" ]]; then
+          # Normal mode: dry-run explicitly set to false, ignore discovery
           echo "Normal mode: dry-run explicitly set to false, ignoring discovery setting"
-        elif [[ "$actual_mode" == "discovery" ]]; then
+          # No extra arg needed for normal mode
+        elif [[ "$INPUT_DISCOVERY" == "true" ]]; then
+          # Discovery mode if not dry-run
           args+=("--discovery")
         fi
 
