@@ -6,6 +6,7 @@ Converts GitHub Actions to use SHA-pinned versions for security.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import logging
 import os
 import re
@@ -124,8 +125,6 @@ class GitHubActionsConverter:
             return False
 
         # Extract the full action reference for matching
-        import fnmatch
-
         for pattern in self.allowlist:
             pattern = pattern.strip()
             if not pattern or pattern.startswith('#'):
