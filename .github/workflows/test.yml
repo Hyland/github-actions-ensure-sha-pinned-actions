@@ -131,7 +131,7 @@ jobs:
       - name: Test actual workflow processing (discovery mode)
         run: |
           # Test on actual workflow files in the repository
-          python gha_sha_convert.py --discovery --path ../.github/workflows
+          python gha_sha_convert.py --discovery --path .github/workflows
 
       - name: Test error handling
         run: |
