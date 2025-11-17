@@ -85,10 +85,6 @@ runs:
           args+=("--discovery")
         fi
 
-        if [[ "$INPUT_EXCLUDE_FIRST_PARTY" == "true" ]]; then
-          args+=("--exclude-first-party")
-        fi
-
         # Handle allowlist - write to temp file if provided
         if [[ -n "$INPUT_ALLOWLIST" ]]; then
           allowlist_file=$(mktemp)

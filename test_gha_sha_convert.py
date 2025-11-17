@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -564,6 +565,154 @@ jobs:
 
         finally:
             os.unlink(temp_file)
+
+
+class TestModeSelectionLogic(unittest.TestCase):
+    """Test cases for mode selection logic in main function."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        # Clear any cached modules
+        if 'gha_sha_convert' in sys.modules:
+            del sys.modules['gha_sha_convert']
+
+    @patch('sys.argv', ['gha_sha_convert.py', '--dry-run'])
+    @patch('os.environ.get', return_value='fake-token')
+    def test_dry_run_mode_with_token(self, mock_env):
+        """Test dry-run mode with token available."""
+        with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
+            mock_converter = Mock()
+            mock_converter.find_yaml_files.return_value = []
+            mock_converter.process_directory.return_value = 0
+            mock_converter.auth_failures = 0
+            mock_converter_class.return_value = mock_converter
+
+            from gha_sha_convert import main
+
+            with self.assertRaises(SystemExit):
+                main()
+
+            # Should be called with token and dry_run_mode=True
+            mock_converter_class.assert_called_once_with(
+                token='fake-token', force=False, allowlist=[],
+            )
+            self.assertTrue(mock_converter.dry_run_mode)
+            self.assertFalse(mock_converter.discovery_mode)
+
+    @patch('sys.argv', ['gha_sha_convert.py', '--dry-run'])
+    @patch('os.environ.get', return_value=None)
+    def test_dry_run_mode_without_token_fallback_to_discovery(self, mock_env):
+        """Test dry-run mode without token falls back to discovery mode."""
+        with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
+            mock_converter = Mock()
+            mock_converter.find_yaml_files.return_value = []
+            mock_converter.process_directory.return_value = 0
+            mock_converter.auth_failures = 0
+            mock_converter_class.return_value = mock_converter
+
+            from gha_sha_convert import main
+
+            with self.assertRaises(SystemExit):
+                main()
+
+            # Should be called with no token and discovery_mode=True
+            mock_converter_class.assert_called_once_with(
+                token=None, force=False, allowlist=[],
+            )
+            self.assertTrue(mock_converter.discovery_mode)
+            self.assertFalse(mock_converter.dry_run_mode)
+
+    @patch('sys.argv', ['gha_sha_convert.py', '--discovery'])
+    @patch('os.environ.get', return_value='fake-token')
+    def test_discovery_mode_ignores_token(self, mock_env):
+        """Test discovery mode ignores token and sets discovery_mode=True."""
+        with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
+            mock_converter = Mock()
+            mock_converter.find_yaml_files.return_value = []
+            mock_converter.process_directory.return_value = 0
+            mock_converter.auth_failures = 0
+            mock_converter_class.return_value = mock_converter
+
+            from gha_sha_convert import main
+
+            with self.assertRaises(SystemExit):
+                main()
+
+            # Should be called with no token even when token is available
+            mock_converter_class.assert_called_once_with(
+                token=None, force=False, allowlist=[],
+            )
+            self.assertTrue(mock_converter.discovery_mode)
+            self.assertFalse(mock_converter.dry_run_mode)
+
+    @patch('sys.argv', ['gha_sha_convert.py'])
+    @patch('os.environ.get', return_value='fake-token')
+    def test_normal_mode_with_token(self, mock_env):
+        """Test normal mode with token available."""
+        with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
+            mock_converter = Mock()
+            mock_converter.find_yaml_files.return_value = []
+            mock_converter.process_directory.return_value = 0
+            mock_converter.auth_failures = 0
+            mock_converter_class.return_value = mock_converter
+
+            from gha_sha_convert import main
+
+            with self.assertRaises(SystemExit):
+                main()
+
+            # Should be called with token and both modes=False
+            mock_converter_class.assert_called_once_with(
+                token='fake-token', force=False, allowlist=[],
+            )
+            self.assertFalse(mock_converter.discovery_mode)
+            self.assertFalse(mock_converter.dry_run_mode)
+
+    @patch('sys.argv', ['gha_sha_convert.py'])
+    @patch('os.environ.get', return_value=None)
+    def test_normal_mode_without_token(self, mock_env):
+        """Test normal mode without token."""
+        with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
+            mock_converter = Mock()
+            mock_converter.find_yaml_files.return_value = []
+            mock_converter.process_directory.return_value = 0
+            mock_converter.auth_failures = 0
+            mock_converter_class.return_value = mock_converter
+
+            from gha_sha_convert import main
+
+            with self.assertRaises(SystemExit):
+                main()
+
+            # Should be called with no token and both modes=False
+            mock_converter_class.assert_called_once_with(
+                token=None, force=False, allowlist=[],
+            )
+            self.assertFalse(mock_converter.discovery_mode)
+            self.assertFalse(mock_converter.dry_run_mode)
+
+    @patch('sys.argv', ['gha_sha_convert.py', '--dry-run', '--discovery'])
+    @patch('os.environ.get', return_value='fake-token')
+    def test_dry_run_takes_precedence_over_discovery(self, mock_env):
+        """Test that dry-run mode takes precedence when both flags are provided."""
+        with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
+            mock_converter = Mock()
+            mock_converter.find_yaml_files.return_value = []
+            mock_converter.process_directory.return_value = 0
+            mock_converter.auth_failures = 0
+            mock_converter_class.return_value = mock_converter
+
+            from gha_sha_convert import main
+
+            with self.assertRaises(SystemExit):
+                main()
+
+            # Should be in dry-run mode, not discovery mode
+            mock_converter_class.assert_called_once_with(
+                token='fake-token', force=False, allowlist=[],
+            )
+            self.assertTrue(mock_converter.dry_run_mode)
+            self.assertFalse(mock_converter.discovery_mode)
 
 
 if __name__ == '__main__':
