@@ -35,14 +35,14 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@ref
+  uses: hyland/github-actions-ensure-sha-pinned-actions@cda680a0136c8c0daede32a0da794dd0578ea661 # v1.0.0
 ```
 
 **With Allowlist:**
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@ref
+  uses: hyland/github-actions-ensure-sha-pinned-actions@cda680a0136c8c0daede32a0da794dd0578ea661 # v1.0.0
   with:
     allowlist: |
       actions/*
@@ -54,7 +54,7 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@ref
+  uses: hyland/github-actions-ensure-sha-pinned-actions@cda680a0136c8c0daede32a0da794dd0578ea661 # v1.0.0
   with:
     allowlist: |
       actions/checkout@*
