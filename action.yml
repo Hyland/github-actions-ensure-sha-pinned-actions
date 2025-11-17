@@ -101,6 +101,7 @@ runs:
         echo "Running: python $ACTION_PATH/gha_sha_convert.py ${args[*]}"
 
         # Capture output and statistics
+        exit_code=0
         output=$(python "$ACTION_PATH/gha_sha_convert.py" "${args[@]}" 2>&1) || exit_code=$?
 
         echo "$output"
