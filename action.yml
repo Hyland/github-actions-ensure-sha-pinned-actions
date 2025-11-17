@@ -1,0 +1,117 @@
+name: GitHub Actions Ensure SHA Pinned Actions
+description: Ensures all GitHub Actions use SHA-pinned versions instead of tag references
+author: Hyland Software, Inc. and its affiliates
+
+inputs:
+  allowlist:
+    description: |
+      List of action patterns to exclude from SHA pinning (one per line).
+      Supports wildcards with *, e.g., 'owner/repo/*' or 'owner/*'.
+      Can also specify specific actions like 'owner/repo/action@v1.0.0'.
+    required: false
+    default: ''
+
+  discovery:
+    description: |
+      When set to 'true', only discovers and lists actions without making API calls.
+      Faster execution but won't provide SHA conversion information.
+      Ignored if dry-run is also set to 'true'.
+    required: false
+    default: 'true'
+
+  dry-run:
+    description: |
+      Controls execution mode. When 'true', reports what would be changed without
+      making modifications. When 'false', makes actual file changes. Takes precedence
+      over discovery mode. Requires GitHub token for API calls unless falling back.
+    required: false
+    default: 'true'
+
+  github-token:
+    description: |
+      GitHub token for API access. Uses GITHUB_TOKEN by default.
+      Required for SHA resolution unless running in discovery mode.
+    required: false
+    default: ${{ github.token }}
+
+  path:
+    description: |
+      Path to search for GitHub Actions workflows and actions.
+      Defaults to current repository root.
+    required: false
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - name: Install Python dependencies
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r "$ACTION_PATH/requirements.txt"
+
+    - name: Run GitHub Actions SHA Converter
+      id: sha-convert
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_DRY_RUN: ${{ inputs.dry-run }}
+        INPUT_DISCOVERY: ${{ inputs.discovery }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_ALLOWLIST: ${{ inputs.allowlist }}
+      run: |
+        # Build command arguments - let Python script handle mode selection logic
+        args=()
+        args+=("--path" "$INPUT_PATH")
+
+        # Pass through dry-run flag if set
+        if [[ "$INPUT_DRY_RUN" == "true" ]]; then
+          args+=("--dry-run")
+        fi
+
+        # Pass through discovery flag if set
+        if [[ "$INPUT_DISCOVERY" == "true" ]]; then
+          args+=("--discovery")
+        fi
+
+        # Handle allowlist - write to temp file if provided
+        if [[ -n "$INPUT_ALLOWLIST" ]]; then
+          allowlist_file=$(mktemp)
+          printf '%s\n' "$INPUT_ALLOWLIST" > "$allowlist_file"
+          args+=("--allowlist" "$allowlist_file")
+        fi
+
+        echo "Running: python $ACTION_PATH/gha_sha_convert.py ${args[*]}"
+
+        # Capture output and statistics
+        exit_code=0
+        output=$(python "$ACTION_PATH/gha_sha_convert.py" "${args[@]}" 2>&1) || exit_code=$?
+
+        echo "$output"
+
+        # Show git diff only if actual changes were made
+        # Exit code 1 means changes were needed/made, and we need to check if it was normal mode
+        if [[ "$exit_code" -eq 1 ]]; then
+          # Only show diff if neither discovery nor dry-run mode (i.e., normal mode with changes)
+          if [[ "$INPUT_DISCOVERY" != "true" && "$INPUT_DRY_RUN" != "true" ]]; then
+            echo ""
+            echo "=== Git diff of changes made ==="
+            git diff --color=always || echo "No changes to display (files may have been added/removed)"
+            echo "================================"
+          fi
+        fi
+
+        # Clean up temp file if created
+        if [[ -n "${allowlist_file:-}" && -f "$allowlist_file" ]]; then
+          rm -f "$allowlist_file"
+        fi
+
+        # Exit with the same code as the Python script
+        exit ${exit_code:-0}
+
+branding:
+  icon: shield
+  color: blue
