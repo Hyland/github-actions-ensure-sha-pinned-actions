@@ -363,7 +363,6 @@ class GitHubActionsConverter:
 
             # In discovery mode, just report what would be processed
             if self.discovery_mode:
-                ref = comment_version if comment_version else version
                 status = (
                     'SHA+semver'
                     if (
