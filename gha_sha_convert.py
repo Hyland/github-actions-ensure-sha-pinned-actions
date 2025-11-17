@@ -225,8 +225,6 @@ class GitHubActionsConverter:
                     response.status_code, owner_repo,
                 )
                 return current_ref
-            elif response.status_code != 200:
-                return current_ref
 
             tags = response.json()
             matching_tags = [
