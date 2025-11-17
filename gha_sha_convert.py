@@ -109,22 +109,13 @@ class GitHubActionsConverter:
         if not self.allowlist:
             return False
 
-        # Extract the full action reference for matching
         for pattern in self.allowlist:
             pattern = pattern.strip()
             if not pattern or pattern.startswith('#'):
                 continue
 
-            # Support wildcard matching
+            # fnmatch handles all pattern types: exact matches, wildcards, and owner/* patterns
             if fnmatch.fnmatch(action_ref, pattern):
-                return True
-
-            # Support exact matching
-            if action_ref == pattern:
-                return True
-
-            # Support owner/* patterns
-            if pattern.endswith('/*') and action_ref.startswith(pattern[:-1]):
                 return True
 
         return False
