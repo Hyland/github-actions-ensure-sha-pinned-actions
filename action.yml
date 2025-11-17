@@ -11,13 +11,6 @@ inputs:
     required: false
     default: ''
 
-  exclude-first-party:
-    description: |
-      Whether to exclude first-party actions (actions from same owner as current repo).
-      Set to 'true' to skip checking actions from the same GitHub organization.
-    required: false
-    default: 'false'
-
   discovery:
     description: |
       When set to 'true', only discovers and lists actions without making API calls.
@@ -68,7 +61,6 @@ runs:
         INPUT_DRY_RUN: ${{ inputs.dry-run }}
         INPUT_DISCOVERY: ${{ inputs.discovery }}
         INPUT_PATH: ${{ inputs.path }}
-        INPUT_EXCLUDE_FIRST_PARTY: ${{ inputs.exclude-first-party }}
         INPUT_ALLOWLIST: ${{ inputs.allowlist }}
       run: |
         # Determine execution mode and build command arguments
@@ -85,10 +77,6 @@ runs:
         elif [[ "$INPUT_DISCOVERY" == "true" ]]; then
           # Discovery mode if not dry-run
           args+=("--discovery")
-        fi
-
-        if [[ "$INPUT_EXCLUDE_FIRST_PARTY" == "true" ]]; then
-          args+=("--exclude-first-party")
         fi
 
         # Handle allowlist - write to temp file if provided

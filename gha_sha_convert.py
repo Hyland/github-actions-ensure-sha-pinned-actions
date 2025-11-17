@@ -41,7 +41,6 @@ class GitHubActionsConverter:
         self.force = force
         self.discovery_mode = False
         self.dry_run_mode = False
-        self.exclude_first_party = False
         self.allowlist = allowlist or []
         self.session = self._create_session()
         self.cache: dict[str, str] = {}
@@ -104,20 +103,6 @@ class GitHubActionsConverter:
     def is_sha(self, version: str) -> bool:
         """Check if version string is a SHA hash."""
         return bool(self.sha_pattern.match(version))
-
-    def is_first_party_action(self, action_ref: str) -> bool:
-        """Check if action is from a first-party/trusted organization."""
-        first_party_orgs = [
-            'actions/',
-            'microsoft/',
-            'azure/',
-            'github/',
-            'docker/',
-            'aws-actions/',
-            'google-github-actions/',
-            'hashicorp/',
-        ]
-        return any(action_ref.startswith(org) for org in first_party_orgs)
 
     def is_allowlisted(self, action_ref: str) -> bool:
         """Check if action matches any allowlist pattern."""
@@ -349,11 +334,6 @@ class GitHubActionsConverter:
 
             covered.add(original_line)
 
-            # Check if this is a first-party action that should be excluded
-            if self.exclude_first_party and self.is_first_party_action(action_ref):
-                logger.info('Skipping first-party action: %s', action_ref)
-                continue
-
             # Check if this action is allowlisted (should be excluded)
             if self.is_allowlisted(action_ref):
                 logger.info('Skipping allowlisted action: %s', action_ref)
@@ -499,11 +479,6 @@ def main():
         help='Dry run mode: make API calls but no file changes',
     )
     parser.add_argument(
-        '--exclude-first-party',
-        action='store_true',
-        help='Exclude first-party actions (actions/, microsoft/, azure/, etc.)',
-    )
-    parser.add_argument(
         '--allowlist',
         help='Path to file containing allowlist patterns (one per line) or comma-separated patterns',
     )
@@ -587,7 +562,6 @@ def main():
     )
     converter.discovery_mode = args.discovery
     converter.dry_run_mode = args.dry_run
-    converter.exclude_first_party = args.exclude_first_party
 
     total_changes = 0
     files_processed = 0
