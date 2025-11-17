@@ -497,28 +497,29 @@ def main():
     # Get GitHub token from environment only for security
     token = os.environ.get('GITHUB_TOKEN')
 
-    # Handle mode selection logic
-    actual_mode = None
+    # Handle mode selection logic and set converter modes directly
     if args.dry_run and not token:
         # If dry-run is requested but no token available, fall back to discovery mode
         logger.info('Dry-run mode requested but no GitHub token available, falling back to discovery mode')
-        args.discovery = True
-        actual_mode = 'discovery_fallback'
+        discovery_mode = True
+        dry_run_mode = False
         token = None
-    elif args.dry_run and token:
+    elif args.dry_run:
         # Dry-run mode with token available
         logger.info('Dry-run mode: making API calls but no file changes')
-        actual_mode = 'dry_run'
+        discovery_mode = False
+        dry_run_mode = True
     elif args.discovery:
         logger.info('Discovery mode: scanning files without API calls or changes')
-        actual_mode = 'discovery'
+        discovery_mode = True
+        dry_run_mode = False
         token = None
-    elif not token:
-        logger.warning('GITHUB_TOKEN not set. Limited functionality available.')
-        actual_mode = 'normal'
     else:
-        # Normal mode with token
-        actual_mode = 'normal'
+        # Normal mode (with or without token)
+        if not token:
+            logger.warning('GITHUB_TOKEN not set. Limited functionality available.')
+        discovery_mode = False
+        dry_run_mode = False
 
     # Parse allowlist if provided
     allowlist = []
@@ -561,14 +562,9 @@ def main():
         token=token, force=args.force, allowlist=allowlist,
     )
 
-    # Set converter mode based on actual execution mode
-    if actual_mode == 'discovery_fallback':
-        # Force discovery mode when falling back from dry-run
-        converter.discovery_mode = True
-        converter.dry_run_mode = False
-    else:
-        converter.discovery_mode = args.discovery
-        converter.dry_run_mode = args.dry_run
+    # Set converter modes directly
+    converter.discovery_mode = discovery_mode
+    converter.dry_run_mode = dry_run_mode
 
     total_changes = 0
     files_processed = 0
@@ -606,10 +602,10 @@ def main():
                 logger.error('Error processing %s: %s', search_path, e)
                 errors_encountered += 1
 
-    # Print summary based on actual mode used
-    if actual_mode in ('discovery', 'discovery_fallback'):
+    # Print summary based on mode used
+    if discovery_mode:
         logger.info('Discovery complete: %d files scanned', files_processed)
-    elif actual_mode == 'dry_run':
+    elif dry_run_mode:
         logger.info(
             'Dry run complete: %d files processed, %d potential changes',
             files_processed, total_changes,

@@ -693,8 +693,8 @@ class TestModeSelectionLogic(unittest.TestCase):
 
     @patch('sys.argv', ['gha_sha_convert.py', '--dry-run', '--discovery'])
     @patch('os.environ.get', return_value='fake-token')
-    def test_dry_run_with_discovery_both_flags_set(self, mock_env):
-        """Test current (buggy) behavior when both flags are provided - both modes get set."""
+    def test_dry_run_takes_precedence_over_discovery(self, mock_env):
+        """Test that dry-run mode takes precedence when both flags are provided."""
         with patch('gha_sha_convert.GitHubActionsConverter') as mock_converter_class:
             mock_converter = Mock()
             mock_converter.find_yaml_files.return_value = []
@@ -707,12 +707,12 @@ class TestModeSelectionLogic(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 main()
 
-            # Current buggy behavior: both modes get set to True
+            # Should be in dry-run mode, not discovery mode (dry-run takes precedence)
             mock_converter_class.assert_called_once_with(
                 token='fake-token', force=False, allowlist=[],
             )
             self.assertTrue(mock_converter.dry_run_mode)
-            self.assertTrue(mock_converter.discovery_mode)  # This is the bug
+            self.assertFalse(mock_converter.discovery_mode)
 
 
 if __name__ == '__main__':
