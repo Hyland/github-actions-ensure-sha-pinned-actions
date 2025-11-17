@@ -25,7 +25,7 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 ## Table of Contents
 
 - [GitHub Action](#github-action)
-- [Pre-commit Hook](#precommit-hook)
+- [Pre-commit Hook](#pre-commit-hook)
 - [Development](#development)
 - [Release](#release)
 
@@ -77,7 +77,7 @@ uses: actions/setup-node@64ed1c7eab4cce3362f8c340dee64e5eaeef8f7c # v3.6.0
 uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v4.1.1
 ```
 
-## Precommit Hook
+## Pre-commit Hook
 
 The same feature can be achieved with [pre-commit](https://pre-commit.com/).
 
