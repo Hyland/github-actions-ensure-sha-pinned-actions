@@ -11,7 +11,6 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 - **SHA Pinning**: Automatically converts tag references to SHA hashes with version comments
 - **Allowlist Support**: Skip specific actions from conversion using flexible pattern matching
-- **First-party Exclusion**: Option to exclude actions from trusted organizations
 - **Dry Run Mode**: Preview changes without modifying files
 - **Discovery Mode**: Fast scanning without API calls
 
