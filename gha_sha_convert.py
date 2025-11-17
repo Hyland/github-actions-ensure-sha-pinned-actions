@@ -551,8 +551,15 @@ def main():
     converter = GitHubActionsConverter(
         token=token, force=args.force, allowlist=allowlist,
     )
-    converter.discovery_mode = args.discovery
-    converter.dry_run_mode = args.dry_run
+
+    # Set converter mode based on actual execution mode
+    if actual_mode == 'discovery_fallback':
+        # Force discovery mode when falling back from dry-run
+        converter.discovery_mode = True
+        converter.dry_run_mode = False
+    else:
+        converter.discovery_mode = args.discovery
+        converter.dry_run_mode = args.dry_run
 
     total_changes = 0
     files_processed = 0
