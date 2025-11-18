@@ -35,14 +35,14 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@cda680a0136c8c0daede32a0da794dd0578ea661 # v1.0.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
 ```
 
 **With Allowlist:**
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@cda680a0136c8c0daede32a0da794dd0578ea661 # v1.0.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
   with:
     allowlist: |
       actions/*
@@ -54,7 +54,7 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@cda680a0136c8c0daede32a0da794dd0578ea661 # v1.0.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
   with:
     allowlist: |
       actions/checkout@*
@@ -88,7 +88,7 @@ Add to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/hyland/github-actions-ensure-sha-pinned-actions
-    rev: v1.0.1
+    rev: 22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
     hooks:
       - id: gha-sha-convert
 ```
