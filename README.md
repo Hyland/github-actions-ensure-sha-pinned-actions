@@ -88,7 +88,7 @@ Add to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/hyland/github-actions-ensure-sha-pinned-actions
-    rev: v1.0.0
+    rev: v1.0.1
     hooks:
       - id: gha-sha-convert
 ```
@@ -116,7 +116,7 @@ Example with force flag:
 
 ### Requirements
 
-- Python 3.10+ (3.10-3.13 supported)
+- Python 3.9+ (3.9-3.13 supported)
 - GitHub token with `repo` scope
 - Internet connection (for GitHub API calls)
 
