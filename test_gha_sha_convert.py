@@ -572,6 +572,7 @@ class TestModeSelectionLogic(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        self.converter = GitHubActionsConverter(token='fake-token', force=False)
         # Clear any cached modules
         if 'gha_sha_convert' in sys.modules:
             del sys.modules['gha_sha_convert']
@@ -713,6 +714,49 @@ class TestModeSelectionLogic(unittest.TestCase):
             )
             self.assertTrue(mock_converter.dry_run_mode)
             self.assertFalse(mock_converter.discovery_mode)
+
+    @patch('gha_sha_convert.requests.Session.get')
+    def test_find_best_version_for_sha_returns_none_on_auth_failure(self, mock_get):
+        """Test that find_best_version_for_sha returns None instead of 'unknown-version' on auth failure."""
+        # Mock 403 auth failure
+        mock_response = Mock()
+        mock_response.status_code = 403
+        mock_get.return_value = mock_response
+
+        # Test with non-semver current_ref
+        result = self.converter.find_best_version_for_sha('owner/repo', 'a' * 40, 'main')
+        self.assertIsNone(result)
+
+        # Test with semver current_ref - should return the semver
+        result = self.converter.find_best_version_for_sha('owner/repo', 'a' * 40, 'v1.2.3')
+        self.assertEqual(result, 'v1.2.3')
+
+    def test_process_file_sha_api_failure_skip(self):
+        """Test processing SHA-pinned action when API fails to find semver."""
+        content = '''name: Test
+jobs:
+  test:
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as f:
+            f.write(content)
+            f.flush()
+
+            try:
+                # Mock API to return None (failure)
+                with patch.object(self.converter, 'find_best_version_for_sha') as mock_find:
+                    mock_find.return_value = None
+
+                    changes = self.converter.process_file(Path(f.name))
+                    self.assertEqual(changes, 0)  # Should skip, no changes
+
+                    # Read the file - should be unchanged
+                    with open(f.name) as updated_file:
+                        updated_content = updated_file.read()
+                        self.assertEqual(updated_content.strip(), content.strip())
+            finally:
+                os.unlink(f.name)
 
 
 if __name__ == '__main__':
