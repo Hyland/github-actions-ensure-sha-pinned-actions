@@ -20,87 +20,9 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 0
-
-      - name: Get release type from PR label
-        id: set-release-level
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
-        with:
-          script: |
-            let level = '';
-            if (context.payload.pull_request) {
-              const labels = context.payload.pull_request.labels.map(label => label.name);
-              if (labels.includes('release/major')) {
-                level = 'major';
-              } else if (labels.includes('release/minor')) {
-                level = 'minor';
-              } else if (labels.includes('release/patch')) {
-                level = 'patch';
-              }
-            }
-            else {
-              level = context.payload.inputs.release_type;
-            }
-
-            core.setOutput('release-level', level);
-            return level;
-
-      - name: Get latest tag and bump version
-        id: bump-semver
-        if: ${{ steps.set-release-level.outputs.release-level != '' }}
-        env:
-          RELEASE_LEVEL: ${{ steps.set-release-level.outputs.release-level }}
-        run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          if [[ "$LATEST_TAG" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-.+)?$ ]]; then
-            MAJOR="${BASH_REMATCH[1]}"
-            MINOR="${BASH_REMATCH[2]}"
-            PATCH="${BASH_REMATCH[3]}"
-          else
-            MAJOR=0
-            MINOR=0
-            PATCH=0
-          fi
-
-          # Bump version based on release level
-          case "$RELEASE_LEVEL" in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-
-          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
-          echo "new-version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Create and push tag
-        if: ${{ steps.set-release-level.outputs.release-level != '' }}
-        env:
-          NEW_VERSION: ${{ steps.bump-semver.outputs.new-version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
-          git push origin "$NEW_VERSION"
-
-      - name: Generate release notes
-        if: ${{ steps.set-release-level.outputs.release-level != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NEW_VERSION: ${{ steps.bump-semver.outputs.new-version }}
-        run: gh release create "$NEW_VERSION" --generate-notes -t "$NEW_VERSION"
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    uses: Alfresco/alfresco-build-tools/.github/workflows/reusable-release.yml@v12.8.1
+    with:
+      release_type_override: ${{ inputs.release_type }}
+    secrets:
+      BOT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
