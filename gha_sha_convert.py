@@ -515,8 +515,8 @@ def main():
     else:
         # Normal mode (with or without token)
         if not token:
-            logger.warning('GITHUB_TOKEN not set. Limited functionality available.')
-        discovery_mode = False
+            logger.warning('GITHUB_TOKEN not set. Enabling discovery mode.')
+        discovery_mode = True
         dry_run_mode = False
 
     # Parse allowlist if provided

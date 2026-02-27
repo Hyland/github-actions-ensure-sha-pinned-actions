@@ -665,7 +665,7 @@ class TestModeSelectionLogic(unittest.TestCase):
             mock_converter_class.assert_called_once_with(
                 token='fake-token', force=False, allowlist=[],
             )
-            self.assertFalse(mock_converter.discovery_mode)
+            self.assertTrue(mock_converter.discovery_mode)
             self.assertFalse(mock_converter.dry_run_mode)
 
     @patch('sys.argv', ['gha_sha_convert.py'])
@@ -688,7 +688,7 @@ class TestModeSelectionLogic(unittest.TestCase):
             mock_converter_class.assert_called_once_with(
                 token=None, force=False, allowlist=[],
             )
-            self.assertFalse(mock_converter.discovery_mode)
+            self.assertTrue(mock_converter.discovery_mode)
             self.assertFalse(mock_converter.dry_run_mode)
 
     @patch('sys.argv', ['gha_sha_convert.py', '--dry-run', '--discovery'])
