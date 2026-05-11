@@ -215,7 +215,8 @@ class GitHubActionsConverter:
                     owner_repo,
                 )
                 self.auth_failures += 1
-                return current_ref
+                # Return current_ref only if it's a semver, otherwise return None to signal skip
+                return current_ref if self.is_semver(current_ref) else None
             elif response.status_code == 429:
                 logger.error('GitHub API rate limit exceeded')
                 sys.exit(1)
@@ -224,7 +225,8 @@ class GitHubActionsConverter:
                     'GitHub API request failed with status %d for %s',
                     response.status_code, owner_repo,
                 )
-                return current_ref
+                # Return current_ref only if it's a semver, otherwise return None to signal skip
+                return current_ref if self.is_semver(current_ref) else None
 
             tags = response.json()
             matching_tags = [
@@ -286,10 +288,10 @@ class GitHubActionsConverter:
 
         except requests.exceptions.RequestException as e:
             logger.error('GitHub API request failed for %s@%s: %s', owner_repo, sha, e)
-            return current_ref
+            return current_ref if self.is_semver(current_ref) else None
         except Exception as e:
             logger.error('Unexpected error finding version for %s@%s: %s', owner_repo, sha, e)
-            return current_ref
+            return current_ref if self.is_semver(current_ref) else None
 
     def process_file(self, file_path: Path) -> int:
         """Process a single YAML file.
@@ -359,22 +361,57 @@ class GitHubActionsConverter:
             # Determine the reference to use for SHA lookup
             ref = comment_version if comment_version else version
 
-            # Skip if already using SHA and has semantic version comment
-            if (
-                self.is_sha(version)
-                and not self.force
-                and comment_version
-                and self.is_semver(comment_version)
-            ):
-                logger.debug(
-                    '%s@%s # %s already using SHA with semver, skipping',
-                    owner_repo, version, comment_version,
-                )
-                continue
-
             # Get SHA for the reference
             if self.is_sha(version) and not self.force:
                 sha = version
+                # For SHA-pinned actions, always check if comment version is correct
+                if comment_version and self.is_semver(comment_version):
+                    # Check if the comment version is correct for this SHA
+                    if not self.token:
+                        logger.warning('No GitHub token provided, cannot verify comment version for %s', action_ref)
+                        continue
+
+                    correct_version = self.find_best_version_for_sha(
+                        owner_repo, sha, comment_version,
+                    )
+
+                    # If API call failed or returned a SHA instead of semver, keep existing comment
+                    if not correct_version or self.is_sha(correct_version):
+                        logger.warning(
+                            'Could not find semver for %s@%s, keeping existing comment %s',
+                            owner_repo, sha, comment_version,
+                        )
+                        continue
+
+                    if comment_version == correct_version:
+                        logger.debug(
+                            '%s@%s # %s already using correct SHA with correct semver, skipping',
+                            owner_repo, sha, comment_version,
+                        )
+                        continue
+                    else:
+                        logger.debug(
+                            '%s@%s # %s using SHA but incorrect semver comment (should be %s)',
+                            owner_repo, sha, comment_version, correct_version,
+                        )
+                        final_version = correct_version
+                else:
+                    # No comment or invalid semver - find the best version
+                    if not self.token:
+                        logger.warning('No GitHub token provided, skipping API calls for %s', action_ref)
+                        continue
+
+                    final_version = self.find_best_version_for_sha(
+                        owner_repo, sha, version,  # Use original version as fallback, not ref
+                    )
+
+                    # If API call failed or returned a SHA, skip this action
+                    if not final_version or self.is_sha(final_version):
+                        logger.warning(
+                            'Could not find semver for %s@%s, skipping',
+                            owner_repo, sha,
+                        )
+                        continue
             else:
                 if not self.token:
                     logger.warning('No GitHub token provided, skipping API calls for %s', action_ref)
@@ -385,10 +422,10 @@ class GitHubActionsConverter:
                     logger.warning('Could not resolve SHA for %s@%s', owner_repo, ref)
                     continue
 
-            # Find best version for comment
-            final_version = self.find_best_version_for_sha(
-                owner_repo, sha, ref,
-            )
+                # Find best version for comment
+                final_version = self.find_best_version_for_sha(
+                    owner_repo, sha, ref,
+                )
 
             # Create the replacement
             new_line = f"uses: {action_ref}@{sha} # {final_version}"
