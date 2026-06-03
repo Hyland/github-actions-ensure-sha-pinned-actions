@@ -10,6 +10,8 @@ updates:
       default-days: 3
     groups:
       python-packages:
+        patterns:
+          - "*"
         update-types:
           - "minor"
           - "patch"
