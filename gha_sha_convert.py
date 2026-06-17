@@ -62,7 +62,7 @@ class GitHubActionsConverter:
         session.mount('https://', adapter)
 
         if self.token:
-            session.headers.update({'Authorization': f"token {self.token}"})
+            session.headers.update({'Authorization': f'token {self.token}'})
 
         return session
 
@@ -93,7 +93,7 @@ class GitHubActionsConverter:
         """
         parts = action_ref.split('/')
         if len(parts) >= 2:
-            return f"{parts[0]}/{parts[1]}"
+            return f'{parts[0]}/{parts[1]}'
         return action_ref
 
     def is_semver(self, version: str) -> bool:
@@ -130,13 +130,13 @@ class GitHubActionsConverter:
         Returns:
             SHA hash or None if not found
         """
-        cache_key = f"{owner_repo}@{tag}"
+        cache_key = f'{owner_repo}@{tag}'
         if cache_key in self.cache:
             return self.cache[cache_key]
 
         try:
             # First try getting the tag reference
-            url = f"https://api.github.com/repos/{owner_repo}/git/refs/tags/{tag}"
+            url = f'https://api.github.com/repos/{owner_repo}/git/refs/tags/{tag}'
             response = self.session.get(url)
 
             if response.status_code == 404:
@@ -206,7 +206,7 @@ class GitHubActionsConverter:
             Best version string for comments
         """
         try:
-            url = f"https://api.github.com/repos/{owner_repo}/tags"
+            url = f'https://api.github.com/repos/{owner_repo}/tags'
             response = self.session.get(url)
 
             if response.status_code == 401:
@@ -239,10 +239,10 @@ class GitHubActionsConverter:
                 dots = current_ref.count('.')
                 if dots == 0:
                     pattern = re.compile(
-                        rf"{re.escape(current_ref)}\.\d+\.\d+",
+                        rf'{re.escape(current_ref)}\.\d+\.\d+',
                     )
                 elif dots == 1:
-                    pattern = re.compile(rf"{re.escape(current_ref)}\.\d+")
+                    pattern = re.compile(rf'{re.escape(current_ref)}\.\d+')
                 else:
                     pattern = None
 
@@ -322,9 +322,9 @@ class GitHubActionsConverter:
             # Handle case where comment_version might be None
             comment_version = comment_version or ''
 
-            original_line = f"uses: {action_ref}@{version}"
+            original_line = f'uses: {action_ref}@{version}'
             if comment_version:
-                original_line += f" # {comment_version}"
+                original_line += f' # {comment_version}'
 
             if original_line in covered:
                 logger.debug('Skipping %s, already processed', original_line)
@@ -391,7 +391,7 @@ class GitHubActionsConverter:
             )
 
             # Create the replacement
-            new_line = f"uses: {action_ref}@{sha} # {final_version}"
+            new_line = f'uses: {action_ref}@{sha} # {final_version}'
 
             if original_line != new_line:
                 if self.dry_run_mode:
