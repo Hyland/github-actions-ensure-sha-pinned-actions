@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import requests
+import yaml
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -291,6 +292,33 @@ class GitHubActionsConverter:
             logger.error('Unexpected error finding version for %s@%s: %s', owner_repo, sha, e)
             return current_ref
 
+    def _extract_uses_from_yaml(self, content: str) -> set[str] | None:
+        """Parse YAML and return all actual 'uses:' values from step/job definitions.
+
+        Returns None if YAML parsing fails (caller should fall back to regex-only).
+        """
+        try:
+            data = yaml.safe_load(content)
+        except yaml.YAMLError:
+            return None
+        if not isinstance(data, dict):
+            return set()
+        uses_values: set[str] = set()
+        self._walk_yaml_for_uses(data, uses_values)
+        return uses_values
+
+    def _walk_yaml_for_uses(self, obj: object, uses_values: set[str]) -> None:
+        """Recursively walk a parsed YAML object collecting 'uses' string values."""
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                if key == 'uses' and isinstance(value, str):
+                    uses_values.add(value)
+                else:
+                    self._walk_yaml_for_uses(value, uses_values)
+        elif isinstance(obj, list):
+            for item in obj:
+                self._walk_yaml_for_uses(item, uses_values)
+
     def process_file(self, file_path: Path) -> int:
         """Process a single YAML file.
 
@@ -308,8 +336,19 @@ class GitHubActionsConverter:
             logger.error('Error reading file %s: %s', file_path, e)
             return 0
 
+        # Extract real 'uses:' values via YAML parsing to avoid false matches
+        # inside run: shell blocks. Falls back to None (no filter) on parse error.
+        valid_uses = self._extract_uses_from_yaml(content)
+
         # Find all action references using pre-compiled pattern
         matches = self.action_pattern.findall(content)
+
+        if valid_uses is not None:
+            matches = [
+                (ref, ver, comment)
+                for ref, ver, comment in matches
+                if f'{ref}@{ver}' in valid_uses
+            ]
 
         if not matches:
             logger.debug('No action references found in %s', file_path)
