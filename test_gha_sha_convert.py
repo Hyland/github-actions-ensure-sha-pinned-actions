@@ -786,5 +786,114 @@ class TestModeSelectionLogic(unittest.TestCase):
             self.assertFalse(mock_converter.discovery_mode)
 
 
+class TestYAMLAwareExtraction(unittest.TestCase):
+    """Test that process_file uses YAML parsing to avoid false matches in run: blocks."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.converter = GitHubActionsConverter(token='fake-token', force=False)
+        self.converter.discovery_mode = True
+
+    def _run_discovery(self, content: str) -> int:
+        """Write content to a temp file, run discovery, return change count."""
+        with tempfile.NamedTemporaryFile(
+            mode='w', suffix='.yml', delete=False,
+        ) as tmp:
+            tmp.write(content)
+            tmp_path = Path(tmp.name)
+        try:
+            return self.converter.process_file(tmp_path)
+        finally:
+            tmp_path.unlink()
+
+    def test_uses_in_run_block_not_picked_up(self):
+        """uses: inside a run: shell heredoc must not be treated as an action ref."""
+        content = """\
+name: Test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate fixture
+        run: |
+          cat > /tmp/fixture.yml << 'EOF'
+          - uses: actions/checkout@v4
+          - uses: actions/setup-node@v3.8.1
+          EOF
+"""
+        changes = self._run_discovery(content)
+        self.assertEqual(changes, 0, 'Refs inside run: heredoc should not be detected')
+
+    def test_real_uses_step_is_still_detected(self):
+        """A genuine uses: step that needs conversion must still be detected."""
+        content = """\
+name: Test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+"""
+        changes = self._run_discovery(content)
+        self.assertEqual(changes, 1, 'Real unpinned uses: step must be reported')
+
+    def test_mixed_real_and_run_block_refs(self):
+        """Only real uses: steps are counted, not ones buried in run: blocks."""
+        content = """\
+name: Test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate fixture
+        run: |
+          echo "- uses: actions/setup-node@v3.8.1" > /tmp/fixture.yml
+"""
+        changes = self._run_discovery(content)
+        self.assertEqual(changes, 0, 'Already-pinned real step + heredoc ref should yield 0 changes')
+
+    def test_invalid_yaml_falls_back_to_regex(self):
+        """Invalid YAML must not crash process_file; it falls back to regex scanning."""
+        content = """\
+name: Test
+on: [push
+jobs:
+  - uses: actions/checkout@v4
+"""
+        # Should not raise; just process without crashing
+        try:
+            self._run_discovery(content)
+        except Exception as exc:
+            self.fail(f'process_file raised on invalid YAML: {exc}')
+
+    def test_extract_uses_from_yaml_returns_none_on_bad_yaml(self):
+        """_extract_uses_from_yaml returns None for unparseable YAML."""
+        result = self.converter._extract_uses_from_yaml('{ invalid yaml: [')
+        self.assertIsNone(result)
+
+    def test_extract_uses_from_yaml_returns_set_of_refs(self):
+        """_extract_uses_from_yaml returns all real uses: values."""
+        content = """\
+name: Test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@abc123def456abc123def456abc123def456abc1 # v4
+      - uses: actions/setup-node@v3.8.1
+"""
+        result = self.converter._extract_uses_from_yaml(content)
+        self.assertIsNotNone(result)
+        # YAML parses inline comments away, so the value is the ref without the comment
+        self.assertIn('actions/checkout@abc123def456abc123def456abc123def456abc1', result)
+        self.assertIn('actions/setup-node@v3.8.1', result)
+        self.assertEqual(len(result), 2)
+
+
 if __name__ == '__main__':
     unittest.main()
