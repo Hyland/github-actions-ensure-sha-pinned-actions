@@ -26,9 +26,10 @@ jobs:
       (github.actor != 'dependabot[bot]' && github.event_name != 'pull_request_review')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run pre-commit
-        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        uses: Alfresco/alfresco-build-tools/.github/actions/pre-commit@4e61fa01622e3f3a1898eb059d9a3af208897515 # v18.9.0
+      - name: Ensure SHA pinned actions
+        uses: ./
 
   python-tests:
     runs-on: ubuntu-latest
