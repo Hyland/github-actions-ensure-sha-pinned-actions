@@ -155,13 +155,35 @@ class TestGitHubActionsConverter(unittest.TestCase):
 
     @patch('gha_sha_convert.requests.Session.get')
     def test_get_sha_for_tag_not_found(self, mock_get):
-        """Test handling of tag not found."""
+        """Test handling of tag not found and branch not found either."""
         mock_response = Mock()
         mock_response.status_code = 404
         mock_get.return_value = mock_response
 
         sha = self.converter.get_sha_for_tag('owner/repo', 'nonexistent')
         self.assertIsNone(sha)
+        self.assertEqual(mock_get.call_count, 2)  # Tag lookup + branch fallback
+
+    @patch('gha_sha_convert.requests.Session.get')
+    def test_get_sha_for_branch_fallback(self, mock_get):
+        """Test that branch names fall back to refs/heads when tag lookup returns 404."""
+        tag_not_found = Mock()
+        tag_not_found.status_code = 404
+
+        branch_response = Mock()
+        branch_response.status_code = 200
+        branch_response.json.return_value = {
+            'object': {'type': 'commit', 'sha': 'c' * 40},
+        }
+
+        mock_get.side_effect = [tag_not_found, branch_response]
+
+        sha = self.converter.get_sha_for_tag('dtolnay/rust-toolchain', 'nightly')
+        self.assertEqual(sha, 'c' * 40)
+        self.assertEqual(mock_get.call_count, 2)
+        # Verify the second call was to the heads endpoint
+        branch_call_url = mock_get.call_args_list[1][0][0]
+        self.assertIn('/git/refs/heads/nightly', branch_call_url)
 
     @patch('gha_sha_convert.requests.Session.get')
     def test_get_sha_for_tag_auth_failure(self, mock_get):

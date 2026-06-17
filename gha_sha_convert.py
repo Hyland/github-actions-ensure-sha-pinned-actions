@@ -121,11 +121,11 @@ class GitHubActionsConverter:
         return False
 
     def get_sha_for_tag(self, owner_repo: str, tag: str) -> str | None:
-        """Get SHA hash for a given tag.
+        """Get SHA hash for a given tag or branch.
 
         Args:
             owner_repo: Repository in format 'owner/repo'
-            tag: Git tag name
+            tag: Git tag or branch name
 
         Returns:
             SHA hash or None if not found
@@ -140,8 +140,15 @@ class GitHubActionsConverter:
             response = self.session.get(url)
 
             if response.status_code == 404:
-                logger.warning('Tag %s not found for %s', tag, owner_repo)
-                return None
+                # Tag not found - fall back to branch reference
+                branch_url = f"https://api.github.com/repos/{owner_repo}/git/refs/heads/{tag}"
+                branch_response = self.session.get(branch_url)
+                if branch_response.status_code == 200:
+                    logger.debug('Resolved %s as branch reference for %s', tag, owner_repo)
+                    response = branch_response
+                else:
+                    logger.warning('Tag or branch %s not found for %s', tag, owner_repo)
+                    return None
             elif response.status_code == 401:
                 logger.error(
                     'GitHub API authentication failed for %s@%s (status 401)',
