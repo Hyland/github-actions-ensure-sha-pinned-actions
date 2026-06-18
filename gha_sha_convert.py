@@ -142,6 +142,7 @@ class GitHubActionsConverter:
         if response.status_code == 429:
             logger.error('GitHub API rate limit exceeded')
             sys.exit(1)
+            return True  # unreachable; sys.exit raises, but satisfies type checkers
         if response.status_code >= 400:
             logger.error(
                 'GitHub API request failed with status %d for %s@%s',
