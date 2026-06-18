@@ -121,12 +121,42 @@ class GitHubActionsConverter:
 
         return False
 
+    def _check_response_errors(
+        self, response: requests.Response, owner_repo: str, ref: str,
+    ) -> bool:
+        """Check a GitHub API response for error status codes.
+
+        Handles 401 (increments auth_failures), 429 (exits), and other 4xx/5xx
+        errors with appropriate logging.
+
+        Returns:
+            True if the response has an error status and the caller should return None.
+        """
+        if response.status_code == 401:
+            logger.error(
+                'GitHub API authentication failed for %s@%s (status 401)',
+                owner_repo, ref,
+            )
+            self.auth_failures += 1
+            return True
+        if response.status_code == 429:
+            logger.error('GitHub API rate limit exceeded')
+            sys.exit(1)
+            return True  # unreachable; sys.exit raises, but satisfies type checkers
+        if response.status_code >= 400:
+            logger.error(
+                'GitHub API request failed with status %d for %s@%s',
+                response.status_code, owner_repo, ref,
+            )
+            return True
+        return False
+
     def get_sha_for_tag(self, owner_repo: str, tag: str) -> str | None:
-        """Get SHA hash for a given tag.
+        """Get SHA hash for a given tag or branch.
 
         Args:
             owner_repo: Repository in format 'owner/repo'
-            tag: Git tag name
+            tag: Git tag or branch name
 
         Returns:
             SHA hash or None if not found
@@ -141,23 +171,17 @@ class GitHubActionsConverter:
             response = self.session.get(url)
 
             if response.status_code == 404:
-                logger.warning('Tag %s not found for %s', tag, owner_repo)
-                return None
-            elif response.status_code == 401:
-                logger.error(
-                    'GitHub API authentication failed for %s@%s (status 401)',
-                    owner_repo, tag,
-                )
-                self.auth_failures += 1
-                return None
-            elif response.status_code == 429:
-                logger.error('GitHub API rate limit exceeded')
-                sys.exit(1)
-            elif response.status_code >= 400:
-                logger.error(
-                    'GitHub API request failed with status %d for %s@%s',
-                    response.status_code, owner_repo, tag,
-                )
+                # Tag not found - fall back to branch reference
+                branch_url = f'https://api.github.com/repos/{owner_repo}/git/refs/heads/{tag}'
+                branch_response = self.session.get(branch_url)
+                if branch_response.status_code == 404:
+                    logger.warning('Tag or branch %s not found for %s', tag, owner_repo)
+                    return None
+                if self._check_response_errors(branch_response, owner_repo, tag):
+                    return None
+                logger.debug('Resolved %s as branch reference for %s', tag, owner_repo)
+                response = branch_response
+            elif self._check_response_errors(response, owner_repo, tag):
                 return None
 
             data = response.json()
@@ -172,12 +196,12 @@ class GitHubActionsConverter:
                 # Annotated tag - need to get the commit it points to
                 tag_url = data['object']['url']
                 tag_response = self.session.get(tag_url)
-                if tag_response.status_code == 200:
-                    tag_data = tag_response.json()
-                    sha = tag_data.get('object', {}).get('sha')
-                else:
+                if self._check_response_errors(tag_response, owner_repo, tag):
+                    return None
+                if tag_response.status_code != 200:
                     logger.warning('Failed to resolve annotated tag %s for %s', tag, owner_repo)
                     return None
+                sha = tag_response.json().get('object', {}).get('sha')
             else:
                 # Direct commit reference
                 sha = data.get('object', {}).get('sha')
