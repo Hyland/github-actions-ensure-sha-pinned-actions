@@ -172,7 +172,7 @@ class GitHubActionsConverter:
 
             if response.status_code == 404:
                 # Tag not found - fall back to branch reference
-                branch_url = f"https://api.github.com/repos/{owner_repo}/git/refs/heads/{tag}"
+                branch_url = f'https://api.github.com/repos/{owner_repo}/git/refs/heads/{tag}'
                 branch_response = self.session.get(branch_url)
                 if branch_response.status_code == 404:
                     logger.warning('Tag or branch %s not found for %s', tag, owner_repo)
