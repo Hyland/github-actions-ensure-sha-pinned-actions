@@ -10,6 +10,7 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 **Key Features:**
 
 - **SHA Pinning**: Automatically converts tag references to SHA hashes with version comments
+- **Comment Validation**: Verifies and updates version comments on SHA-pinned actions
 - **Allowlist Support**: Skip specific actions from conversion using flexible pattern matching
 - **Dry Run Mode**: Preview changes without modifying files
 - **Discovery Mode**: Fast scanning without API calls
@@ -76,6 +77,24 @@ uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 uses: actions/setup-node@64ed1c7eab4cce3362f8c340dee64e5eaeef8f7c # v3.6.0
 uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v4.1.1
 ```
+
+**Comment Validation and Maintenance:**
+
+The tool also validates and maintains version comments on already SHA-pinned actions:
+
+```yaml
+# Incorrect comment gets fixed
+uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.6
+# ↓ Updated to correct version
+uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+# Missing comment gets added
+uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+# ↓ Comment added
+uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+```
+
+This feature is particularly useful for ensuring Dependabot updates are properly maintained. When Dependabot updates a SHA-pinned action to a newer version, it updates both the SHA and the comment. This tool verifies that Dependabot's comment matches the actual semantic version for the new SHA, catching any potential inconsistencies in automated updates.
 
 ## Pre-commit Hook
 
