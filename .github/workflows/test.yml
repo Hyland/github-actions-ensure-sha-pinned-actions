@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run pre-commit
-        uses: Alfresco/alfresco-build-tools/.github/actions/pre-commit@10cea6c0b390c4f8af21d9dc1670d581bd10319f # v18.13.0
+        uses: Alfresco/alfresco-build-tools/.github/actions/pre-commit@a8bc14631a9ce72275346e536607c4527591112a # v18.18.0
       - name: Ensure SHA pinned actions
         uses: ./
 
