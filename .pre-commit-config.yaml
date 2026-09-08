@@ -12,7 +12,7 @@ repos:
       - id: mixed-line-ending
         args: ['--fix=lf']
   - repo: https://github.com/sirosen/check-jsonschema
-    rev: 0.34.1
+    rev: 0.38.0
     hooks:
       - id: check-dependabot
       - id: check-github-actions
