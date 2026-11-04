@@ -138,6 +138,8 @@ class GitHubActionsConverter:
             candidate = parent / '.github' / 'workflows' / 'actions.lock'
             if candidate.is_file():
                 return candidate
+            if (parent / '.git').exists() or (parent / '.github').is_dir():
+                return None
         return None
 
     def _load_lockfile(self, lock_path: Path) -> dict | None:
