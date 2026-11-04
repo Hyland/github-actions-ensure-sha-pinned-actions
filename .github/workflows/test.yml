@@ -27,9 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run pre-commit
-        uses: Alfresco/alfresco-build-tools/.github/actions/pre-commit@768b583839a22ef7d882da0c5b82af3832197d00 # v19.7.1
+        uses: Alfresco/alfresco-build-tools/.github/actions/pre-commit@v19.7.1
       - name: Ensure SHA pinned actions
-        uses: ./
+        uses: $/
+        with:
+          lock-aware: 'true'
 
   python-tests:
     runs-on: ubuntu-latest
@@ -49,7 +51,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -120,7 +122,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.10'
 

@@ -63,6 +63,19 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+**With GitHub workflow dependency lockfile:**
+
+If your repository uses [workflow dependency lockfiles](https://docs.github.com/en/actions/concepts/security/workflow-dependency-lockfiles) (`gh actions-lock`), workflows keep tag references and the SHAs live in `.github/workflows/actions.lock`. Enable `lock-aware` so references without a SHA are accepted when the lockfile pins them:
+
+```yaml
+- name: Ensure SHA pinned actions
+  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  with:
+    lock-aware: "true"
+```
+
+An action without a SHA is accepted only if the workflow is listed in the lockfile, the `action@ref` is in its dependency list and has a valid `commit`. Everything else is reported as before. Reusable workflow calls are not covered by lockfiles and still require an inline SHA.
+
 **Example Conversion:**
 
 ```yaml

@@ -446,7 +446,7 @@ class TestMainFunction(unittest.TestCase):
             # Should exit with 0 for no changes
             self.assertEqual(cm.exception.code, 0)
             mock_converter_class.assert_called_once_with(
-                token='fake-token', force=True, allowlist=[],
+                token='fake-token', force=True, allowlist=[], lock_aware=False,
             )
 
     @patch('gha_sha_convert.GitHubActionsConverter')
@@ -535,7 +535,7 @@ jobs:
             self.assertEqual(cm.exception.code, 0)
             # Should be called with no token in discovery mode
             mock_converter_class.assert_called_once_with(
-                token=None, force=False, allowlist=[],
+                token=None, force=False, allowlist=[], lock_aware=False,
             )
 
     @patch('sys.argv', ['gha_sha_convert.py', '--dry-run'])
@@ -665,7 +665,7 @@ class TestModeSelectionLogic(unittest.TestCase):
 
             # Should be called with token and dry_run_mode=True
             mock_converter_class.assert_called_once_with(
-                token='fake-token', force=False, allowlist=[],
+                token='fake-token', force=False, allowlist=[], lock_aware=False,
             )
             self.assertTrue(mock_converter.dry_run_mode)
             self.assertFalse(mock_converter.discovery_mode)
@@ -688,7 +688,7 @@ class TestModeSelectionLogic(unittest.TestCase):
 
             # Should be called with no token and discovery_mode=True
             mock_converter_class.assert_called_once_with(
-                token=None, force=False, allowlist=[],
+                token=None, force=False, allowlist=[], lock_aware=False,
             )
             self.assertTrue(mock_converter.discovery_mode)
             self.assertFalse(mock_converter.dry_run_mode)
@@ -711,7 +711,7 @@ class TestModeSelectionLogic(unittest.TestCase):
 
             # Should be called with no token even when token is available
             mock_converter_class.assert_called_once_with(
-                token=None, force=False, allowlist=[],
+                token=None, force=False, allowlist=[], lock_aware=False,
             )
             self.assertTrue(mock_converter.discovery_mode)
             self.assertFalse(mock_converter.dry_run_mode)
@@ -734,7 +734,7 @@ class TestModeSelectionLogic(unittest.TestCase):
 
             # Should be called with token and both modes=False
             mock_converter_class.assert_called_once_with(
-                token='fake-token', force=False, allowlist=[],
+                token='fake-token', force=False, allowlist=[], lock_aware=False,
             )
             self.assertFalse(mock_converter.discovery_mode)
             self.assertFalse(mock_converter.dry_run_mode)
@@ -757,7 +757,7 @@ class TestModeSelectionLogic(unittest.TestCase):
 
             # Should be called with no token and both modes=False
             mock_converter_class.assert_called_once_with(
-                token=None, force=False, allowlist=[],
+                token=None, force=False, allowlist=[], lock_aware=False,
             )
             self.assertFalse(mock_converter.discovery_mode)
             self.assertFalse(mock_converter.dry_run_mode)
@@ -780,7 +780,7 @@ class TestModeSelectionLogic(unittest.TestCase):
 
             # Should be in dry-run mode, not discovery mode (dry-run takes precedence)
             mock_converter_class.assert_called_once_with(
-                token='fake-token', force=False, allowlist=[],
+                token='fake-token', force=False, allowlist=[], lock_aware=False,
             )
             self.assertTrue(mock_converter.dry_run_mode)
             self.assertFalse(mock_converter.discovery_mode)
@@ -897,3 +897,101 @@ jobs:
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestLockAware(unittest.TestCase):
+    """Test cases for lockfile-aware mode."""
+
+    LOCK = (
+        "version: 'v0.0.3'\n"
+        'workflows:\n'
+        "  '.github/workflows/ci.yml':\n"
+        "    - 'actions/checkout@v4'\n"
+        "    - 'bad/entry@v1'\n"
+        "    - 'o/r/.github/workflows/x.yml@v1'\n"
+        'dependencies:\n'
+        "  'actions/checkout@v4':\n"
+        "    ref: 'v4'\n"
+        "    commit: 'sha1-%s'\n"
+        "  'bad/entry@v1':\n"
+        "    ref: 'v1'\n"
+        "    commit: 'nope'\n"
+        "  'o/r/.github/workflows/x.yml@v1':\n"
+        "    ref: 'v1'\n"
+        "    commit: '%s'\n"
+    ) % ('a' * 40, 'b' * 40)
+
+    def _run(
+        self, workflow: str, lock: str | None, lock_aware: bool = True,
+        name: str = 'ci.yml',
+    ) -> int:
+        with tempfile.TemporaryDirectory() as tmp:
+            wf_dir = Path(tmp) / '.github' / 'workflows'
+            wf_dir.mkdir(parents=True)
+            wf = wf_dir / name
+            wf.write_text(workflow)
+            if lock is not None:
+                (wf_dir / 'actions.lock').write_text(lock)
+            converter = GitHubActionsConverter(token=None, lock_aware=lock_aware)
+            converter.discovery_mode = True
+            return converter.process_file(wf)
+
+    def test_locked_ref_is_accepted(self):
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n'
+        self.assertEqual(self._run(wf, self.LOCK), 0)
+
+    def test_disabled_by_default(self):
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n'
+        self.assertEqual(self._run(wf, self.LOCK, lock_aware=False), 1)
+
+    def test_missing_lockfile_or_entry_fails(self):
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/setup-node@v4\n'
+        self.assertEqual(self._run(wf, self.LOCK), 1)
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n'
+        self.assertEqual(self._run(wf, None), 1)
+
+    def test_workflow_not_onboarded_fails(self):
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n'
+        self.assertEqual(self._run(wf, self.LOCK, name='other.yml'), 1)
+
+    def test_invalid_commit_fails(self):
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: bad/entry@v1\n'
+        self.assertEqual(self._run(wf, self.LOCK), 1)
+
+    def test_malformed_lockfile_fails(self):
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n'
+        self.assertEqual(self._run(wf, '- just\n- a list\n'), 1)
+
+    def test_reusable_workflow_still_requires_sha(self):
+        wf = 'jobs:\n  a:\n    uses: o/r/.github/workflows/x.yml@v1\n'
+        self.assertEqual(self._run(wf, self.LOCK), 1)
+
+    def test_subpath_action_matches_repo_level_key(self):
+        lock = self.LOCK.replace('actions/checkout@v4', 'actions/cache@v4')
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/cache/restore@v4\n'
+        self.assertEqual(self._run(wf, lock), 0)
+
+    def test_owner_repo_match_is_case_insensitive(self):
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: Actions/Checkout@v4\n'
+        self.assertEqual(self._run(wf, self.LOCK), 0)
+        # The ref itself stays case-sensitive
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/checkout@V4\n'
+        self.assertEqual(self._run(wf, self.LOCK), 1)
+
+    def test_composite_action_needs_only_dependency_entry(self):
+        action = (
+            'runs:\n  using: composite\n  steps:\n'
+            '    - uses: actions/checkout@v4\n'
+            '    - uses: actions/setup-node@v4\n'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / '.github' / 'workflows').mkdir(parents=True)
+            (root / '.github' / 'workflows' / 'actions.lock').write_text(self.LOCK)
+            act = root / '.github' / 'actions' / 'x'
+            act.mkdir(parents=True)
+            (act / 'action.yml').write_text(action)
+            converter = GitHubActionsConverter(token=None, lock_aware=True)
+            converter.discovery_mode = True
+            # checkout is in the lock's dependencies, setup-node is not
+            self.assertEqual(converter.process_file(act / 'action.yml'), 1)
