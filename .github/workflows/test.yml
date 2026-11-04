@@ -30,6 +30,8 @@ jobs:
         uses: Alfresco/alfresco-build-tools/.github/actions/pre-commit@v19.7.1
       - name: Ensure SHA pinned actions
         uses: $/
+        with:
+          lock-aware: 'true'
 
   python-tests:
     runs-on: ubuntu-latest
