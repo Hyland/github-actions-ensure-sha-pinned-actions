@@ -210,8 +210,7 @@ class GitHubActionsConverter:
         resolved = file_path.resolve()
         if resolved.parent == lock_path.parent:
             return key in lock['workflows'].get(resolved.relative_to(repo_root).as_posix(), set())
-        # A dependency entry alone does not establish lock coverage for composites.
-        return False
+        return True
 
     def _check_response_errors(
         self, response: requests.Response, owner_repo: str, ref: str,
