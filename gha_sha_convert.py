@@ -159,7 +159,14 @@ class GitHubActionsConverter:
         else:
             workflows = loaded.get('workflows') if isinstance(loaded, dict) else None
             dependencies = loaded.get('dependencies') if isinstance(loaded, dict) else None
-            if isinstance(workflows, dict) and isinstance(dependencies, dict):
+            if (
+                isinstance(workflows, dict)
+                and isinstance(dependencies, dict)
+                and all(
+                    isinstance(deps, list) and all(isinstance(key, str) for key in deps)
+                    for deps in workflows.values()
+                )
+            ):
                 result = {
                     'workflows': {
                         str(path): {self._lock_key(str(k)) for k in (deps or [])}
