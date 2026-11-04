@@ -979,7 +979,11 @@ class TestLockAware(unittest.TestCase):
         self.assertEqual(self._run(wf, self.LOCK), 1)
 
     def test_composite_action_needs_only_dependency_entry(self):
-        action = 'runs:\n  using: composite\n  steps:\n    - uses: actions/checkout@v4\n    - uses: actions/setup-node@v4\n'
+        action = (
+            'runs:\n  using: composite\n  steps:\n'
+            '    - uses: actions/checkout@v4\n'
+            '    - uses: actions/setup-node@v4\n'
+        )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / '.github' / 'workflows').mkdir(parents=True)
