@@ -965,3 +965,29 @@ class TestLockAware(unittest.TestCase):
     def test_reusable_workflow_still_requires_sha(self):
         wf = 'jobs:\n  a:\n    uses: o/r/.github/workflows/x.yml@v1\n'
         self.assertEqual(self._run(wf, self.LOCK), 1)
+
+    def test_subpath_action_matches_repo_level_key(self):
+        lock = self.LOCK.replace('actions/checkout@v4', 'actions/cache@v4')
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/cache/restore@v4\n'
+        self.assertEqual(self._run(wf, lock), 0)
+
+    def test_owner_repo_match_is_case_insensitive(self):
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: Actions/Checkout@v4\n'
+        self.assertEqual(self._run(wf, self.LOCK), 0)
+        # The ref itself stays case-sensitive
+        wf = 'jobs:\n  a:\n    steps:\n      - uses: actions/checkout@V4\n'
+        self.assertEqual(self._run(wf, self.LOCK), 1)
+
+    def test_composite_action_needs_only_dependency_entry(self):
+        action = 'runs:\n  using: composite\n  steps:\n    - uses: actions/checkout@v4\n    - uses: actions/setup-node@v4\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / '.github' / 'workflows').mkdir(parents=True)
+            (root / '.github' / 'workflows' / 'actions.lock').write_text(self.LOCK)
+            act = root / '.github' / 'actions' / 'x'
+            act.mkdir(parents=True)
+            (act / 'action.yml').write_text(action)
+            converter = GitHubActionsConverter(token=None, lock_aware=True)
+            converter.discovery_mode = True
+            # checkout is in the lock's dependencies, setup-node is not
+            self.assertEqual(converter.process_file(act / 'action.yml'), 1)

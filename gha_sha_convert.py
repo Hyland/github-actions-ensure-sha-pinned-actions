@@ -126,59 +126,82 @@ class GitHubActionsConverter:
 
         return False
 
+    @staticmethod
+    def _lock_key(key: str) -> str:
+        """Normalize a lockfile key: owner/repo are case-insensitive, the ref is not."""
+        name, sep, ref = key.rpartition('@')
+        return f'{name.lower()}{sep}{ref}' if sep else key.lower()
+
+    def _find_lockfile(self, file_path: Path) -> Path | None:
+        """Find .github/workflows/actions.lock in the closest ancestor of file_path."""
+        for parent in file_path.resolve().parents:
+            candidate = parent / '.github' / 'workflows' / 'actions.lock'
+            if candidate.is_file():
+                return candidate
+        return None
+
     def _load_lockfile(self, lock_path: Path) -> dict | None:
-        """Load and cache a workflow dependency lockfile (None if missing/invalid)."""
+        """Load, normalize and cache a workflow dependency lockfile.
+
+        Returns None if the file is unreadable or malformed, otherwise
+        {'workflows': {path: {key, ...}}, 'commits': {key: sha}}.
+        """
         if lock_path in self._lock_cache:
             return self._lock_cache[lock_path]
 
-        data = None
-        if lock_path.is_file():
-            try:
-                loaded = yaml.safe_load(lock_path.read_text())
-            except (OSError, yaml.YAMLError) as e:
-                logger.warning('Could not read lockfile %s: %s', lock_path, e)
+        result = None
+        try:
+            loaded = yaml.safe_load(lock_path.read_text())
+        except (OSError, yaml.YAMLError) as e:
+            logger.warning('Could not read lockfile %s: %s', lock_path, e)
+        else:
+            workflows = loaded.get('workflows') if isinstance(loaded, dict) else None
+            dependencies = loaded.get('dependencies') if isinstance(loaded, dict) else None
+            if isinstance(workflows, dict) and isinstance(dependencies, dict):
+                result = {
+                    'workflows': {
+                        str(path): {self._lock_key(str(k)) for k in (deps or [])}
+                        for path, deps in workflows.items()
+                    },
+                    'commits': {
+                        self._lock_key(str(key)): entry['commit'].removeprefix('sha1-')
+                        for key, entry in dependencies.items()
+                        if isinstance(entry, dict) and isinstance(entry.get('commit'), str)
+                    },
+                }
             else:
-                if isinstance(loaded, dict):
-                    data = loaded
-                else:
-                    logger.warning('Ignoring malformed lockfile %s', lock_path)
-        self._lock_cache[lock_path] = data
-        return data
+                logger.warning('Ignoring malformed lockfile %s', lock_path)
+        self._lock_cache[lock_path] = result
+        return result
 
     def is_locked(self, file_path: Path, action_ref: str, version: str) -> bool:
-        """Check if action@version is pinned to a commit by the workflow's lockfile.
+        """Check if action@version is pinned to a commit by the repository lockfile.
 
-        The lockfile is expected next to the workflow (.github/workflows/actions.lock).
-        Reusable workflow calls are not covered by lockfiles and need an inline SHA.
+        The lockfile (.github/workflows/actions.lock) is found by walking up from the
+        file. Entries are keyed by owner/repo@ref without any action subpath.
+        Workflow files must be onboarded (listed under 'workflows'); other files
+        such as composite actions have no entry of their own, so their references
+        only need a valid entry under 'dependencies'. Reusable workflow calls are
+        not covered by lockfiles and need an inline SHA.
         """
         if '/.github/workflows/' in f'/{action_ref}':
             return False
 
-        lock_path = file_path.parent / 'actions.lock'
-        lock = self._load_lockfile(lock_path)
+        lock_path = self._find_lockfile(file_path)
+        lock = self._load_lockfile(lock_path) if lock_path else None
         if lock is None:
             return False
 
-        key = f'{action_ref}@{version}'
-        workflows = lock.get('workflows')
-        dependencies = lock.get('dependencies')
-        if not isinstance(workflows, dict) or not isinstance(dependencies, dict):
+        key = self._lock_key(f'{self.extract_owner_repo(action_ref)}@{version}')
+        if not self.is_sha(lock['commits'].get(key, '')):
             return False
 
         # Lockfile workflow keys are relative to the repository root
         repo_root = lock_path.parent.parent.parent
-        try:
-            workflow_key = file_path.relative_to(repo_root).as_posix()
-        except ValueError:
-            workflow_key = file_path.as_posix()
-        if key not in (workflows.get(workflow_key) or []):
-            return False
-
-        entry = dependencies.get(key)
-        commit = entry.get('commit') if isinstance(entry, dict) else None
-        if not isinstance(commit, str):
-            return False
-        return self.is_sha(commit.removeprefix('sha1-'))
+        resolved = file_path.resolve()
+        if resolved.parent == lock_path.parent:
+            return key in lock['workflows'].get(resolved.relative_to(repo_root).as_posix(), set())
+        return True
 
     def _check_response_errors(
         self, response: requests.Response, owner_repo: str, ref: str,
