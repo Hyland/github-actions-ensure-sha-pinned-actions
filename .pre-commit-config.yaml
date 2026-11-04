@@ -21,6 +21,8 @@ repos:
     rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # frozen: v1.7.12
     hooks:
       - id: actionlint
+        # actionlint does not yet recognize repository-root action references.
+        args: [ '-ignore', '^specifying action "\$/[^"]+" in invalid format because ref is missing\.' ]
   - repo: https://github.com/asottile/reorder-python-imports
     rev: 4690733311bbfba33558e4d50a7f0092c64d78d8 # frozen: v3.19.0
     hooks:
