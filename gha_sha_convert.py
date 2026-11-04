@@ -30,6 +30,7 @@ class GitHubActionsConverter:
         token: str | None = None,
         force: bool = False,
         allowlist: list[str] | None = None,
+        lock_aware: bool = False,
     ):
         """Initialize the converter.
 
@@ -37,12 +38,16 @@ class GitHubActionsConverter:
             token: GitHub token for API access
             force: Force conversion even if already using SHA
             allowlist: List of action patterns to exclude from conversion
+            lock_aware: Treat non-SHA refs as pinned when covered by an
+                actions.lock file (GitHub workflow dependency lockfile)
         """
         self.token = token or os.environ.get('GITHUB_TOKEN')
         self.force = force
         self.discovery_mode = False
         self.dry_run_mode = False
         self.allowlist = allowlist or []
+        self.lock_aware = lock_aware
+        self._lock_cache: dict[Path, dict | None] = {}
         self.session = self._create_session()
         self.cache: dict[str, str] = {}
         self.auth_failures = 0  # Track authentication failures
@@ -120,6 +125,60 @@ class GitHubActionsConverter:
                 return True
 
         return False
+
+    def _load_lockfile(self, lock_path: Path) -> dict | None:
+        """Load and cache a workflow dependency lockfile (None if missing/invalid)."""
+        if lock_path in self._lock_cache:
+            return self._lock_cache[lock_path]
+
+        data = None
+        if lock_path.is_file():
+            try:
+                loaded = yaml.safe_load(lock_path.read_text())
+            except (OSError, yaml.YAMLError) as e:
+                logger.warning('Could not read lockfile %s: %s', lock_path, e)
+            else:
+                if isinstance(loaded, dict):
+                    data = loaded
+                else:
+                    logger.warning('Ignoring malformed lockfile %s', lock_path)
+        self._lock_cache[lock_path] = data
+        return data
+
+    def is_locked(self, file_path: Path, action_ref: str, version: str) -> bool:
+        """Check if action@version is pinned to a commit by the workflow's lockfile.
+
+        The lockfile is expected next to the workflow (.github/workflows/actions.lock).
+        Reusable workflow calls are not covered by lockfiles and need an inline SHA.
+        """
+        if '/.github/workflows/' in f'/{action_ref}':
+            return False
+
+        lock_path = file_path.parent / 'actions.lock'
+        lock = self._load_lockfile(lock_path)
+        if lock is None:
+            return False
+
+        key = f'{action_ref}@{version}'
+        workflows = lock.get('workflows')
+        dependencies = lock.get('dependencies')
+        if not isinstance(workflows, dict) or not isinstance(dependencies, dict):
+            return False
+
+        # Lockfile workflow keys are relative to the repository root
+        repo_root = lock_path.parent.parent.parent
+        try:
+            workflow_key = file_path.relative_to(repo_root).as_posix()
+        except ValueError:
+            workflow_key = file_path.as_posix()
+        if key not in (workflows.get(workflow_key) or []):
+            return False
+
+        entry = dependencies.get(key)
+        commit = entry.get('commit') if isinstance(entry, dict) else None
+        if not isinstance(commit, str):
+            return False
+        return self.is_sha(commit.removeprefix('sha1-'))
 
     def _check_response_errors(
         self, response: requests.Response, owner_repo: str, ref: str,
@@ -400,6 +459,15 @@ class GitHubActionsConverter:
                 logger.info('Skipping allowlisted action: %s', action_ref)
                 continue
 
+            # Non-SHA refs covered by the lockfile are pinned by GitHub itself
+            if (
+                self.lock_aware
+                and not self.is_sha(version)
+                and self.is_locked(file_path, action_ref, version)
+            ):
+                logger.info('Skipping %s@%s, pinned by actions.lock', action_ref, version)
+                continue
+
             owner_repo = self.extract_owner_repo(action_ref)
 
             # In discovery mode, just report what would be processed
@@ -544,6 +612,11 @@ def main():
         help='Path to file containing allowlist patterns (one per line) or comma-separated patterns',
     )
     parser.add_argument(
+        '--lock-aware',
+        action='store_true',
+        help='Treat non-SHA references as pinned when listed in .github/workflows/actions.lock',
+    )
+    parser.add_argument(
         'files',
         nargs='*',
         help='Specific files to process (default: search workflow directories)',
@@ -621,6 +694,7 @@ def main():
     # Initialize converter
     converter = GitHubActionsConverter(
         token=token, force=args.force, allowlist=allowlist,
+        lock_aware=args.lock_aware,
     )
 
     # Set converter modes directly

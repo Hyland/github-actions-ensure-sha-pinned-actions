@@ -41,6 +41,15 @@ inputs:
     required: false
     default: '.'
 
+  lock-aware:
+    description: |
+      When 'true', actions referenced by tag/branch (no SHA) are treated as pinned
+      if they are recorded in the workflow dependency lockfile
+      (.github/workflows/actions.lock). Actions missing from the lockfile are still
+      reported. Reusable workflow calls always require an inline SHA.
+    required: false
+    default: 'false'
+
 runs:
   using: composite
   steps:
@@ -62,6 +71,7 @@ runs:
         INPUT_DISCOVERY: ${{ inputs.discovery }}
         INPUT_PATH: ${{ inputs.path }}
         INPUT_ALLOWLIST: ${{ inputs.allowlist }}
+        INPUT_LOCK_AWARE: ${{ inputs.lock-aware }}
       run: |
         # Build command arguments - let Python script handle mode selection logic
         args=()
@@ -75,6 +85,11 @@ runs:
         # Pass through discovery flag if set
         if [[ "$INPUT_DISCOVERY" == "true" ]]; then
           args+=("--discovery")
+        fi
+
+        # Pass through lock-aware flag if set
+        if [[ "$INPUT_LOCK_AWARE" == "true" ]]; then
+          args+=("--lock-aware")
         fi
 
         # Handle allowlist - write to temp file if provided
