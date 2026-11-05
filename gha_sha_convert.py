@@ -31,6 +31,7 @@ class GitHubActionsConverter:
         force: bool = False,
         allowlist: list[str] | None = None,
         lock_aware: bool = False,
+        sha_only_paths: list[str] | None = None,
     ):
         """Initialize the converter.
 
@@ -40,6 +41,8 @@ class GitHubActionsConverter:
             allowlist: List of action patterns to exclude from conversion
             lock_aware: Treat non-SHA refs as pinned when covered by an
                 actions.lock file (GitHub workflow dependency lockfile)
+            sha_only_paths: Glob patterns of files (e.g. generated lock files)
+                where a full SHA is required but the version comment is not
         """
         self.token = token or os.environ.get('GITHUB_TOKEN')
         self.force = force
@@ -47,6 +50,7 @@ class GitHubActionsConverter:
         self.dry_run_mode = False
         self.allowlist = allowlist or []
         self.lock_aware = lock_aware
+        self.sha_only_paths = [p.strip() for p in (sha_only_paths or []) if p.strip()]
         self._lock_cache: dict[Path, dict | None] = {}
         self.session = self._create_session()
         self.cache: dict[str, str] = {}
@@ -125,6 +129,22 @@ class GitHubActionsConverter:
                 return True
 
         return False
+
+    def is_sha_only(self, file_path: Path) -> bool:
+        """Check if a file only needs SHA pins, without version comments."""
+        if not self.sha_only_paths:
+            return False
+
+        try:
+            rel = file_path.resolve().relative_to(Path.cwd().resolve())
+        except ValueError:
+            rel = file_path
+
+        rel_posix = rel.as_posix()
+        return any(
+            fnmatch.fnmatch(rel_posix, pattern) or rel.match(pattern)
+            for pattern in self.sha_only_paths
+        )
 
     @staticmethod
     def _lock_key(key: str) -> str:
@@ -471,6 +491,7 @@ class GitHubActionsConverter:
 
         covered: set[str] = set()
         changes = 0
+        sha_only = self.is_sha_only(file_path)
 
         for action_ref, version, comment_version in matches:
             # Handle case where comment_version might be None
@@ -498,6 +519,11 @@ class GitHubActionsConverter:
                 and self.is_locked(file_path, action_ref, version)
             ):
                 logger.info('Skipping %s@%s, pinned by actions.lock', action_ref, version)
+                continue
+
+            # Generated files only need a SHA; the version comment is optional
+            if sha_only and self.is_sha(version) and not self.force:
+                logger.info('Skipping %s@%s, SHA-only file', action_ref, version)
                 continue
 
             owner_repo = self.extract_owner_repo(action_ref)
@@ -625,6 +651,12 @@ def main():
         help='Path to search for workflow files (can be specified multiple times)',
     )
     parser.add_argument(
+        '--sha-only-path',
+        action='append',
+        default=[],
+        help='Glob of files where a full SHA is required but the version comment is optional (repeatable)',
+    )
+    parser.add_argument(
         '--discovery',
         action='store_true',
         help='Discovery mode: scan files but make no API calls or changes',
@@ -732,6 +764,7 @@ def main():
     # Set converter modes directly
     converter.discovery_mode = discovery_mode
     converter.dry_run_mode = dry_run_mode
+    converter.sha_only_paths = [p.strip() for p in args.sha_only_path if p.strip()]
 
     total_changes = 0
     files_processed = 0

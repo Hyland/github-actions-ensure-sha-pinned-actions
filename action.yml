@@ -50,6 +50,15 @@ inputs:
     required: false
     default: 'false'
 
+  sha-only-paths:
+    description: |
+      Glob patterns (one per line, relative to the working directory) of files,
+      such as generated '**/*.lock.yml' workflows, where a full commit SHA is
+      required but the version comment is not. Tag and branch references in
+      these files are still reported.
+    required: false
+    default: ''
+
 runs:
   using: composite
   steps:
@@ -72,6 +81,7 @@ runs:
         INPUT_PATH: ${{ inputs.path }}
         INPUT_ALLOWLIST: ${{ inputs.allowlist }}
         INPUT_LOCK_AWARE: ${{ inputs.lock-aware }}
+        INPUT_SHA_ONLY_PATHS: ${{ inputs.sha-only-paths }}
       run: |
         # Build command arguments - let Python script handle mode selection logic
         args=()
@@ -91,6 +101,13 @@ runs:
         if [[ "$INPUT_LOCK_AWARE" == "true" ]]; then
           args+=("--lock-aware")
         fi
+
+        # Pass through SHA-only path patterns, one per line
+        while IFS= read -r pattern; do
+          if [[ -n "$pattern" ]]; then
+            args+=("--sha-only-path" "$pattern")
+          fi
+        done <<< "$INPUT_SHA_ONLY_PATHS"
 
         # Handle allowlist - write to temp file if provided
         if [[ -n "$INPUT_ALLOWLIST" ]]; then
