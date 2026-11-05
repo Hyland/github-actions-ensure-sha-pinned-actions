@@ -31,18 +31,20 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 ## GitHub Action
 
+In the examples below, replace `<ref>` with the commit SHA of the release you want to use (followed by a `# vX.Y.Z` comment).
+
 **Basic Usage:**
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
 ```
 
 **With Allowlist:**
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
   with:
     allowlist: |
       actions/*
@@ -54,7 +56,7 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
   with:
     allowlist: |
       actions/checkout@*
@@ -69,7 +71,7 @@ If your repository uses [workflow dependency lockfiles](https://docs.github.com/
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
   with:
     lock-aware: "true"
 ```
@@ -82,7 +84,7 @@ Some generators rewrite workflows and drop the `# vX.Y.Z` comment after a pinned
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
   with:
     sha-only-paths: |
       **/*.lock.yml
