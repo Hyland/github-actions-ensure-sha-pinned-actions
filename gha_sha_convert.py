@@ -141,10 +141,13 @@ class GitHubActionsConverter:
             rel = file_path
 
         rel_posix = rel.as_posix()
-        return any(
-            fnmatch.fnmatch(rel_posix, pattern) or rel.match(pattern)
-            for pattern in self.sha_only_paths
-        )
+        for pattern in self.sha_only_paths:
+            if fnmatch.fnmatch(rel_posix, pattern):
+                return True
+            # fnmatch's '*' crosses '/', but '**/' would still require a directory
+            if pattern.startswith('**/') and fnmatch.fnmatch(rel_posix, pattern[3:]):
+                return True
+        return False
 
     @staticmethod
     def _lock_key(key: str) -> str:
@@ -512,6 +515,17 @@ class GitHubActionsConverter:
                 logger.info('Skipping allowlisted action: %s', action_ref)
                 continue
 
+            # SHA-only files: a full SHA is required, the version comment is not.
+            # They are only reported, never converted or rewritten, even with --force.
+            if sha_only:
+                if not self.is_sha(version):
+                    logger.warning(
+                        '%s@%s in %s must be pinned to a full SHA',
+                        action_ref, version, file_path,
+                    )
+                    changes += 1
+                continue
+
             # Non-SHA refs covered by the lockfile are pinned by GitHub itself
             if (
                 self.lock_aware
@@ -519,11 +533,6 @@ class GitHubActionsConverter:
                 and self.is_locked(file_path, action_ref, version)
             ):
                 logger.info('Skipping %s@%s, pinned by actions.lock', action_ref, version)
-                continue
-
-            # Generated files only need a SHA; the version comment is optional
-            if sha_only and self.is_sha(version) and not self.force:
-                logger.info('Skipping %s@%s, SHA-only file', action_ref, version)
                 continue
 
             owner_repo = self.extract_owner_repo(action_ref)
@@ -591,7 +600,10 @@ class GitHubActionsConverter:
                     content = content.replace(original_line, new_line)
                     changes += 1
 
-        if changes > 0 and not self.discovery_mode and not self.dry_run_mode:
+        if (
+            changes > 0 and not sha_only
+            and not self.discovery_mode and not self.dry_run_mode
+        ):
             try:
                 file_path.write_text(content)
                 logger.info('Updated %s with %d changes', file_path, changes)

@@ -1038,10 +1038,46 @@ class TestShaOnlyPaths(unittest.TestCase):
         self.assertEqual(changes, 1)
 
     def test_tag_reported_in_matching_file(self):
-        changes = self._run(
-            'a.lock.yml', 'actions/checkout@v4', ['**/*.lock.yml'], discovery_mode=True,
-        )
-        self.assertEqual(changes, 1)
+        for mode in ({'discovery_mode': True}, {'dry_run_mode': True}, {}):
+            changes = self._run('a.lock.yml', 'actions/checkout@v4', ['**/*.lock.yml'], **mode)
+            self.assertEqual(changes, 1)
+            self.assertIn('actions/checkout@v4\n', self.content)
+
+    def test_force_does_not_rewrite_matching_file(self):
+        uses = f'actions/checkout@{self.SHA}'
+        self.assertEqual(self._run('a.lock.yml', uses, ['**/*.lock.yml'], force=True), 0)
+        self.assertIn(f'uses: {uses}\n', self.content)
+
+    def test_pattern_matches_full_relative_path_only(self):
+        converter = GitHubActionsConverter(token=None, sha_only_paths=['action.yml'])
+        self.assertTrue(converter.is_sha_only(Path('action.yml')))
+        self.assertFalse(converter.is_sha_only(Path('.github/actions/x/action.yml')))
+
+    def test_recursive_pattern_matches_root_file(self):
+        converter = GitHubActionsConverter(token=None, sha_only_paths=['**/*.lock.yml'])
+        self.assertTrue(converter.is_sha_only(Path('a.lock.yml')))
+        self.assertTrue(converter.is_sha_only(Path('.github/workflows/a.lock.yml')))
+
+    def test_lock_aware_does_not_exempt_tag_in_matching_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            wf = root / '.github' / 'workflows' / 'a.lock.yml'
+            wf.parent.mkdir(parents=True)
+            wf.write_text(
+                'name: t\non: [push]\njobs:\n  j:\n    runs-on: ubuntu-latest\n'
+                '    steps:\n      - uses: actions/checkout@v4\n',
+            )
+            cwd = Path.cwd()
+            os.chdir(root)
+            try:
+                converter = GitHubActionsConverter(
+                    token=None, lock_aware=True, sha_only_paths=['**/*.lock.yml'],
+                )
+                converter.discovery_mode = True
+                with patch.object(converter, 'is_locked', return_value=True):
+                    self.assertEqual(converter.process_file(Path('.github/workflows/a.lock.yml')), 1)
+            finally:
+                os.chdir(cwd)
 
     def test_no_patterns_keeps_existing_behavior(self):
         uses = f'actions/checkout@{self.SHA}'

@@ -88,7 +88,7 @@ Some generators rewrite workflows and drop the `# vX.Y.Z` comment after a pinned
       **/*.lock.yml
 ```
 
-Patterns are matched against paths relative to the working directory. Tag and branch references in matching files are still reported and converted.
+Patterns are matched against paths relative to the working directory. Tag and branch references in matching files are still reported (and fail the check), but matching files are never rewritten, even with `force`, and `lock-aware` does not exempt them.
 
 **Example Conversion:**
 
