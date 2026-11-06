@@ -31,6 +31,7 @@ class GitHubActionsConverter:
         force: bool = False,
         allowlist: list[str] | None = None,
         lock_aware: bool = False,
+        sha_only_paths: list[str] | None = None,
     ):
         """Initialize the converter.
 
@@ -40,6 +41,8 @@ class GitHubActionsConverter:
             allowlist: List of action patterns to exclude from conversion
             lock_aware: Treat non-SHA refs as pinned when covered by an
                 actions.lock file (GitHub workflow dependency lockfile)
+            sha_only_paths: Glob patterns of files (e.g. generated lock files)
+                where a full SHA is required but the version comment is not
         """
         self.token = token or os.environ.get('GITHUB_TOKEN')
         self.force = force
@@ -47,6 +50,7 @@ class GitHubActionsConverter:
         self.dry_run_mode = False
         self.allowlist = allowlist or []
         self.lock_aware = lock_aware
+        self.sha_only_paths = [p.strip() for p in (sha_only_paths or []) if p.strip()]
         self._lock_cache: dict[Path, dict | None] = {}
         self.session = self._create_session()
         self.cache: dict[str, str] = {}
@@ -124,6 +128,25 @@ class GitHubActionsConverter:
             if fnmatch.fnmatch(action_ref, pattern):
                 return True
 
+        return False
+
+    def is_sha_only(self, file_path: Path) -> bool:
+        """Check if a file only needs SHA pins, without version comments."""
+        if not self.sha_only_paths:
+            return False
+
+        try:
+            rel = file_path.resolve().relative_to(Path.cwd().resolve())
+        except ValueError:
+            rel = file_path
+
+        rel_posix = rel.as_posix()
+        for pattern in self.sha_only_paths:
+            if fnmatch.fnmatch(rel_posix, pattern):
+                return True
+            # fnmatch's '*' crosses '/', but '**/' would still require a directory
+            if pattern.startswith('**/') and fnmatch.fnmatch(rel_posix, pattern[3:]):
+                return True
         return False
 
     @staticmethod
@@ -471,6 +494,7 @@ class GitHubActionsConverter:
 
         covered: set[str] = set()
         changes = 0
+        sha_only = self.is_sha_only(file_path)
 
         for action_ref, version, comment_version in matches:
             # Handle case where comment_version might be None
@@ -489,6 +513,17 @@ class GitHubActionsConverter:
             # Check if this action is allowlisted (should be excluded)
             if self.is_allowlisted(action_ref):
                 logger.info('Skipping allowlisted action: %s', action_ref)
+                continue
+
+            # SHA-only files: a full SHA is required, the version comment is not.
+            # They are only reported, never converted or rewritten, even with --force.
+            if sha_only:
+                if not self.is_sha(version):
+                    logger.warning(
+                        '%s@%s in %s must be pinned to a full SHA',
+                        action_ref, version, file_path,
+                    )
+                    changes += 1
                 continue
 
             # Non-SHA refs covered by the lockfile are pinned by GitHub itself
@@ -565,7 +600,10 @@ class GitHubActionsConverter:
                     content = content.replace(original_line, new_line)
                     changes += 1
 
-        if changes > 0 and not self.discovery_mode and not self.dry_run_mode:
+        if (
+            changes > 0 and not sha_only
+            and not self.discovery_mode and not self.dry_run_mode
+        ):
             try:
                 file_path.write_text(content)
                 logger.info('Updated %s with %d changes', file_path, changes)
@@ -623,6 +661,12 @@ def main():
         '--path',
         action='append',
         help='Path to search for workflow files (can be specified multiple times)',
+    )
+    parser.add_argument(
+        '--sha-only-path',
+        action='append',
+        default=[],
+        help='Glob of files where a full SHA is required but the version comment is optional (repeatable)',
     )
     parser.add_argument(
         '--discovery',
@@ -732,6 +776,7 @@ def main():
     # Set converter modes directly
     converter.discovery_mode = discovery_mode
     converter.dry_run_mode = dry_run_mode
+    converter.sha_only_paths = [p.strip() for p in args.sha_only_path if p.strip()]
 
     total_changes = 0
     files_processed = 0
