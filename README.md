@@ -31,18 +31,20 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 ## GitHub Action
 
+In the examples below, replace `<ref>` with the commit SHA of the release you want to use (followed by a `# vX.Y.Z` comment).
+
 **Basic Usage:**
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
 ```
 
 **With Allowlist:**
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
   with:
     allowlist: |
       actions/*
@@ -54,7 +56,7 @@ Ensures all GitHub Actions in your workflows use SHA-pinned versions instead of 
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
   with:
     allowlist: |
       actions/checkout@*
@@ -69,12 +71,26 @@ If your repository uses [workflow dependency lockfiles](https://docs.github.com/
 
 ```yaml
 - name: Ensure SHA pinned actions
-  uses: hyland/github-actions-ensure-sha-pinned-actions@22ca7a8cf33e873ba1d6fbcd2b71fa0ec5006b17 # v1.1.0
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
   with:
     lock-aware: "true"
 ```
 
 An action without a SHA is accepted only if the workflow is listed in the lockfile, the `action@ref` is in its dependency list and has a valid `commit`. Everything else is reported as before. Reusable workflow calls are not covered by lockfiles and still require an inline SHA.
+
+**With generated workflows (gh-aw `*.lock.yml`):**
+
+Some generators rewrite workflows and drop the `# vX.Y.Z` comment after a pinned SHA. Use `sha-only-paths` to keep requiring full SHAs in those files while not requiring (or rewriting) the version comment:
+
+```yaml
+- name: Ensure SHA pinned actions
+  uses: hyland/github-actions-ensure-sha-pinned-actions@<ref>
+  with:
+    sha-only-paths: |
+      **/*.lock.yml
+```
+
+Patterns are matched against paths relative to the working directory. Tag and branch references in matching files are still reported (and fail the check), but matching files are never rewritten, even with `force`, and `lock-aware` does not exempt them.
 
 **Example Conversion:**
 
