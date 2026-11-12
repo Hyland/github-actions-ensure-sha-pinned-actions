@@ -8,7 +8,7 @@ workflows:
     '.github/workflows/test.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
         - 'actions/setup-python@v7.1.0'
-        - 'alfresco/alfresco-build-tools@v19.11.0'
+        - 'alfresco/alfresco-build-tools@v19.13.1'
 dependencies:
     'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9':
         ref: 'v6.1.0'
@@ -20,9 +20,9 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97':
-        ref: 'v7.0.0'
-        commit: 'sha1-5fda3b95a4ea91299a34e894583c3862153e4b97'
+    'actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0':
+        ref: 'v7.1.0'
+        commit: 'sha1-6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'
         owner_id: 44036562
         repo_id: 192625525
     'actions/setup-python@v7.1.0':
@@ -30,23 +30,23 @@ dependencies:
         commit: 'sha1-6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'
         owner_id: 44036562
         repo_id: 192625525
-    'alfresco/alfresco-build-tools@v19.11.0':
-        ref: 'v19.11.0'
-        commit: 'sha1-482401ef42e6503cfa54d5873f1a768a0ecb3e0e'
+    'alfresco/alfresco-build-tools@v19.13.1':
+        ref: 'v19.13.1'
+        commit: 'sha1-2fb68b82ad8ffd30088b5977da32d011af40f6ef'
         owner_id: 391127
         repo_id: 322607229
         uses:
             - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
-            - 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97'
-            - 'astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884'
-            - 'iarekylew00t/verified-bot-commit@42a042b0407248f3c0acac00c389e729e3476e86'
-    'astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884':
-        ref: 'v10.3.0'
-        commit: 'sha1-1c37ad07a6a961277cf70c0d37d6f313000f5884'
+            - 'actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'
+            - 'astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2'
+            - 'iarekylew00t/verified-bot-commit@1ee4374942e5c5f814e9b3121d766cbe45cea360'
+    'astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2':
+        ref: 'v10.3.3'
+        commit: 'sha1-68559e99cc807c1eb7e9238fd43a15bba460eec2'
         owner_id: 115962839
         repo_id: 846733598
-    'iarekylew00t/verified-bot-commit@42a042b0407248f3c0acac00c389e729e3476e86':
-        ref: 'v2.3.5'
-        commit: 'sha1-42a042b0407248f3c0acac00c389e729e3476e86'
+    'iarekylew00t/verified-bot-commit@1ee4374942e5c5f814e9b3121d766cbe45cea360':
+        ref: 'v2.3.6'
+        commit: 'sha1-1ee4374942e5c5f814e9b3121d766cbe45cea360'
         owner_id: 1072572
         repo_id: 851264189
