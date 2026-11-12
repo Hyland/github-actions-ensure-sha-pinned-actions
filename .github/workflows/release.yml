@@ -21,7 +21,7 @@ permissions:
 jobs:
   release:
     if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
-    uses: Alfresco/alfresco-build-tools/.github/workflows/reusable-release.yml@482401ef42e6503cfa54d5873f1a768a0ecb3e0e # v19.11.0
+    uses: Alfresco/alfresco-build-tools/.github/workflows/reusable-release.yml@2fb68b82ad8ffd30088b5977da32d011af40f6ef # v19.13.1
     with:
       release_type_override: ${{ inputs.release_type }}
     secrets:
