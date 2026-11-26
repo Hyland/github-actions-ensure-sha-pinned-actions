@@ -8,7 +8,7 @@ workflows:
     '.github/workflows/test.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
         - 'actions/setup-python@v7.1.0'
-        - 'alfresco/alfresco-build-tools@v19.15.0'
+        - 'alfresco/alfresco-build-tools@v19.16.0'
 dependencies:
     'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9':
         ref: 'v6.1.0'
@@ -30,9 +30,9 @@ dependencies:
         commit: 'sha1-6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'
         owner_id: 44036562
         repo_id: 192625525
-    'alfresco/alfresco-build-tools@v19.15.0':
-        ref: 'v19.15.0'
-        commit: 'sha1-3bbbfc459dd15452e68e3cefcbc56596d88d71ee'
+    'alfresco/alfresco-build-tools@v19.16.0':
+        ref: 'v19.16.0'
+        commit: 'sha1-16298278308f674c76542d61658da190e975e31c'
         owner_id: 391127
         repo_id: 322607229
         uses:
